@@ -47,6 +47,56 @@ public sealed class ContainerStack(EnvConfig config)
 
     public Task DownAsync(CancellationToken ct = default) => StopAndRemoveAllAsync(ct);
 
+    /// <summary>
+    /// Wipes the Jellyfin config directory by running a short-lived container (using the already-
+    /// pulled Jellyfin image) with the config dir bind-mounted and executing <c>rm -rf</c> inside
+    /// it as root. This is necessary because the Jellyfin container runs as root, so the bind-
+    /// mounted config files are root-owned and cannot be deleted by the current (non-root) host
+    /// process.
+    /// </summary>
+    public async Task WipeConfigDirAsync(CancellationToken ct = default)
+    {
+        Console.Out.WriteLine($"[+] Wiping config dir via privileged container ...");
+        using var client = CreateDockerClient();
+
+        var jellyfinImage = $"jellyfin/jellyfin:{config.JellyfinVersion}";
+        var created = await client.Containers.CreateContainerAsync(
+            new CreateContainerParameters
+            {
+                Image = jellyfinImage,
+                // Override the Jellyfin entrypoint so this runs as a plain shell one-shot.
+                Entrypoint = new[] { "sh" },
+                Cmd = new[] { "-c", "rm -rf /target/*" },
+                HostConfig = new HostConfig
+                {
+                    Binds = new[] { $"{config.JellyfinConfigDir}:/target" },
+                    AutoRemove = false,
+                },
+            },
+            ct);
+
+        await client.Containers.StartContainerAsync(created.ID, new ContainerStartParameters(), ct);
+
+        // Wait for the container to finish (it exits immediately after rm -rf).
+        var waitResult = await client.Containers.WaitContainerAsync(created.ID, ct);
+        if (waitResult.StatusCode != 0)
+        {
+            throw new OrchestrationException(
+                $"Config dir wipe container exited with code {waitResult.StatusCode}.");
+        }
+
+        // Clean up the stopped container.
+        try
+        {
+            await client.Containers.RemoveContainerAsync(
+                created.ID, new ContainerRemoveParameters(), ct);
+        }
+        catch (DockerContainerNotFoundException)
+        {
+            // Already gone.
+        }
+    }
+
     public async Task RestartJellyfinAsync(CancellationToken ct = default)
     {
         using var client = CreateDockerClient();
@@ -60,6 +110,40 @@ public sealed class ContainerStack(EnvConfig config)
         catch (DockerContainerNotFoundException)
         {
             throw new OrchestrationException($"Container '{config.JellyfinContainerName}' does not exist; run 'up' first.");
+        }
+    }
+
+    public async Task StopJellyfinAsync(CancellationToken ct = default)
+    {
+        using var client = CreateDockerClient();
+        try
+        {
+            await client.Containers.StopContainerAsync(
+                config.JellyfinContainerName,
+                new ContainerStopParameters { WaitBeforeKillSeconds = 10 },
+                ct);
+        }
+        catch (DockerContainerNotFoundException)
+        {
+            throw new OrchestrationException(
+                $"Container '{config.JellyfinContainerName}' does not exist; run 'up' first.");
+        }
+    }
+
+    public async Task StartJellyfinAsync(CancellationToken ct = default)
+    {
+        using var client = CreateDockerClient();
+        try
+        {
+            await client.Containers.StartContainerAsync(
+                config.JellyfinContainerName,
+                new ContainerStartParameters(),
+                ct);
+        }
+        catch (DockerContainerNotFoundException)
+        {
+            throw new OrchestrationException(
+                $"Container '{config.JellyfinContainerName}' does not exist; run 'up' first.");
         }
     }
 

@@ -56,28 +56,52 @@ public sealed class ProviderProvisioner(EnvConfig config)
 
     private async Task<string> AuthenticateAdminAsync(HttpClient http, CancellationToken ct)
     {
-        var request = new HttpRequestMessage(HttpMethod.Post, "/Users/AuthenticateByName")
+        // TODO: Revisit whether a smarter health probe in ContainerStack.WaitForJellyfinAsync
+        // (e.g., poll /Users/AuthenticateByName itself, or wait on a more specific endpoint)
+        // would remove the need for this retry loop. For now, the loop handles the known cold-start
+        // race where /System/Info/Public is 200 but /Users/AuthenticateByName is 503 for several seconds.
+        // After a stop/restart (ResetAsync), Jellyfin can take 60+ seconds for the auth endpoint to
+        // become available, so 30 attempts at 2s = 60s is the minimum safe budget.
+        const int maxAttempts = 30;
+        var delay = TimeSpan.FromSeconds(2);
+
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
         {
-            Content = JsonContent.Create(new
+            using var request = new HttpRequestMessage(HttpMethod.Post, "/Users/AuthenticateByName")
             {
-                Username = config.AdminUsername,
-                Pw = config.AdminPassword,
-            }),
-        };
-        request.Headers.TryAddWithoutValidation("Authorization", AuthHeaderTemplate);
+                Content = JsonContent.Create(new
+                {
+                    Username = config.AdminUsername,
+                    Pw = config.AdminPassword,
+                }),
+            };
+            request.Headers.TryAddWithoutValidation("Authorization", AuthHeaderTemplate);
 
-        using var response = await http.SendAsync(request, ct);
-        response.EnsureSuccessStatusCode();
-        var body = await response.Content.ReadAsStringAsync(ct);
+            using var response = await http.SendAsync(request, ct);
 
-        using var doc = JsonDocument.Parse(body);
-        if (doc.RootElement.TryGetProperty("AccessToken", out var tokenElement)
-            && tokenElement.GetString() is { Length: > 0 } token)
-        {
-            return token;
+            if ((int)response.StatusCode is >= 500 and < 600 && attempt < maxAttempts)
+            {
+                Console.Out.WriteLine(
+                    $"[+] Admin auth returned {(int)response.StatusCode}; retrying in {delay.TotalSeconds}s "
+                    + $"({attempt}/{maxAttempts}) ...");
+                await Task.Delay(delay, ct);
+                continue;
+            }
+
+            response.EnsureSuccessStatusCode();
+            var body = await response.Content.ReadAsStringAsync(ct);
+            using var doc = JsonDocument.Parse(body);
+            if (doc.RootElement.TryGetProperty("AccessToken", out var tokenElement)
+                && tokenElement.GetString() is { Length: > 0 } token)
+            {
+                return token;
+            }
+
+            throw new OrchestrationException("Admin authentication response did not contain AccessToken.");
         }
 
-        throw new OrchestrationException("Admin authentication response did not contain AccessToken.");
+        throw new OrchestrationException(
+            $"Admin authentication failed with 5xx after {maxAttempts} attempts.");
     }
 
     private async Task<string> EnsureApiKeyAsync(HttpClient http, string token, CancellationToken ct)
