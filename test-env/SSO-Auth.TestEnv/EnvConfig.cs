@@ -63,6 +63,9 @@ public sealed record EnvConfig
     /// <summary>Wait limit for Jellyfin health probe (seconds).</summary>
     public int JellyfinReadyTimeoutSeconds { get; init; } = 120;
 
+    /// <summary>Wait limit for the SSO plugin routes to become available after Jellyfin is up (seconds).</summary>
+    public int PluginReadyTimeoutSeconds { get; init; } = 120;
+
     /// <summary>
     /// Default config matching the current single-stack setup. Resolves <see cref="RepoRoot"/> by walking up from the
     /// executing assembly until SSO-Auth.sln is found.
