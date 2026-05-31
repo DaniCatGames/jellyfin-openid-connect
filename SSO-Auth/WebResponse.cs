@@ -407,13 +407,12 @@ const sleep = (milliseconds) => {
     /// <summary>
     /// A generator for the web response that incorporates the data from the server.
     /// </summary>
-    /// <param name="data">The data of the auth flow. Is signed XML for SAML and a state ID for OpenID.</param>
+    /// <param name="data">The data of the auth flow. Is a state ID for OpenID.</param>
     /// <param name="provider">The name of the provider to callback to.</param>
     /// <param name="baseUrl">The base URL of the Jellyfin installation.</param>
-    /// <param name="mode">The mode of the function; SAML or OID.</param>
     /// <param name="isLinking">Whether or not this request is to link accounts (Rather than authenticate).</param>
     /// <returns>A string with the HTML to serve to the client.</returns>
-    public static string Generator(string data, string provider, string baseUrl, string mode, bool isLinking = false)
+    public static string Generator(string data, string provider, string baseUrl, bool isLinking = false)
     {
         // Strip out the protocol (http:// or https://) and convert the domain to Punycode
         var idnMapping = new IdnMapping();
@@ -436,7 +435,7 @@ async function link(request) {
     if (jfUser == null) return;
     if (jfToken == null) return;
 
-    const url = '" + $"{punycodeBaseUrl}/sso/{mode}/Link/{provider}/" + @"' + jfUser;
+    const url = '" + $"{punycodeBaseUrl}/sso/OID/Link/{provider}/" + @"' + jfUser;
 
     return new Promise(resolve => {
        var xhr = new XMLHttpRequest();
@@ -479,7 +478,7 @@ async function main() {
 
     if (" + $"{isLinking}".ToLower() + @") await link(request);
 
-    var url = '" + punycodeBaseUrl + "/sso/" + mode + "/Auth/" + provider + @"';
+    var url = '" + punycodeBaseUrl + "/sso/OID/Auth/" + provider + @"';
 
     let response = await new Promise(resolve => {
        var xhr = new XMLHttpRequest();

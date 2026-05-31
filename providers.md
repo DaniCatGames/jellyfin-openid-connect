@@ -6,6 +6,9 @@ This plugin has been tested to work against various providers, though not all pr
 
 ## TOC / Tested Providers:
 
+
+❗These providers were tested with the upstream 9p4/jellyfin-plugin-sso plugin, but I've only used Authentik
+
 This section is broken into providers that support Role-Based Access Control (RBAC), and those that do not
 
 ### Providers that support RBAC
@@ -13,7 +16,6 @@ This section is broken into providers that support Role-Based Access Control (RB
 - ✅ [Authelia](#authelia)
 - ✅ [authentik](#authentik)
 - ✅ [Keycloak](#keycloak-oidc)
-  - Both [OIDC](#keycloak-oidc) & [SAML](#keycloak-saml)
 - ✅ [Pocket ID](#pocket-id)
 
 ### No RBAC Support
@@ -195,37 +197,7 @@ keycloak:
 
 ## Keycloak SAML
 
-Keycloak with SAML is very similar to OpenID. Again, Keycloak in general is a little more complicated than other providers. Ensure that you have a realm created and have some usable users.
-
-### Keycloak's Config
-
-Create a new Keycloak `saml` application. Set the root URL to your Jellyfin URL (ie https://myjellyfin.example.com)
-
-Ensure that the following configuration options are set:
-
-- Sign Documents on
-- Sign Assertions off
-- Client Signature Required off
-- Redirect URI: [https://myjellyfin.example.com/sso/SAML/start/PROVIDER_NAME](https://myjellyfin.example.com/sso/SAML/start/PROVIDER_NAME)
-- Base URL: [https://myjellyfin.example.com](https://myjellyfin.example.com)
-- Master SAML processing URL: [https://myjellyfin.example.com/sso/SAML/start/PROVIDER_NAME](https://myjellyfin.example.com/sso/SAML/start/PROVIDER_NAME)
-
-Press the "Save" button at the bottom of the page.
-
-For adding groups and RBAC, go to the "mappers" tab, press "Add Builtin", and select either "Groups", "Realm Roles", or "Client Roles", depending on the role system you are planning on using. Once the mapper is added, edit the mapper and ensure that you note down the Token Claim Name as well as enable all four toggles: "Multivalued", "Add to ID token", "Add to access token", and "Add to userinfo" are enabled.
-
-Note that if you are using the template for the "Client Roles" mapper, the default token claim name has `${client_id}` in it. When noting down this value, make sure you note down the actual Client ID (which should be written above).
-
-Finally, download the certificate. Open the "Installation" tab, select "Mod Auth Mellon files", and download the zip. Extract the zip file, and open the `idp-metadata.xml` file. Note down the contents of the `X509Certificate` value.
-
-### Jellyfin's Config
-
-```yaml
-keycloak:
-  SamlEndpoint: https://keycloak.example.com/realms/<realm>/protocol/saml
-  SamlClientId: <same-as-in-keycloak>
-  SamlCertificate: <copied-from-xml-file>
-```
+SAML support was removed to reduce the surface area of the plugin. This plugin now supports OpenID Connect only; use [Keycloak OIDC](#keycloak-oidc) instead.
 
 ## Pocket ID
 

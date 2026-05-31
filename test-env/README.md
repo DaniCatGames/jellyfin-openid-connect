@@ -139,8 +139,6 @@ write is harmless.
   (Authelia, Authentik, Keycloak, Pocket ID, Kanidm are). Bugs specific to
   one of those won't surface here. If/when broader coverage is wanted, the
   cleanest path is a second compose profile with Keycloak.
-- **OIDC only.** No SAML — Dex doesn't speak SAML. If SAML support is
-  added later, this environment will likely be replaced or extended.
 - **No HTTPS.** Plain HTTP with the plugin's `disableHttps: true` flag.
   Real-world deployments must use HTTPS.
 

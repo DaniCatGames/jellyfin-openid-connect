@@ -94,9 +94,9 @@ public class SSOController : ControllerBase
     // Actually a GET: https://github.com/IdentityModel/IdentityModel.OidcClient/issues/325
     [HttpGet("OID/r/{provider}")]
     [HttpGet("OID/redirect/{provider}")]
-    public async Task<ActionResult> OidPost(
+    public async Task<ActionResult> OidCallback(
         [FromRoute] string provider,
-        [FromQuery] string state) // Although this is a GET function, this function is called `Post` for consistency with SAML
+        [FromQuery] string state)
     {
         OidConfig config;
         try
@@ -333,7 +333,7 @@ public class SSOController : ControllerBase
             if (timedState.Valid)
             {
                 _logger.LogInformation($"Is request linking: {isLinking}");
-                return Content(WebResponse.Generator(data: state, provider: provider, baseUrl: GetRequestBase(config.SchemeOverride, config.PortOverride), mode: "OID", isLinking: isLinking), MediaTypeNames.Text.Html);
+                return Content(WebResponse.Generator(data: state, provider: provider, baseUrl: GetRequestBase(config.SchemeOverride, config.PortOverride), isLinking: isLinking), MediaTypeNames.Text.Html);
             }
             else
             {
@@ -476,16 +476,6 @@ public class SSOController : ControllerBase
     }
 
     /// <summary>
-    /// Lists the SAML providers names only.
-    /// </summary>
-    /// <returns>The list of OpenID configurations.</returns>
-    [HttpGet("SAML/GetNames")]
-    public ActionResult SamlProviderNames()
-    {
-        return Ok(SSOPlugin.Instance.Configuration.SamlConfigs.Keys);
-    }
-
-    /// <summary>
     /// This is a debug endpoint to list all running OpenID flows. Requires administrator privileges.
     /// </summary>
     /// <returns>The list of OpenID flows in progress.</returns>
@@ -523,7 +513,7 @@ public class SSOController : ControllerBase
             {
                 if (kvp.Value.State.State.Equals(response.Data) && kvp.Value.Valid)
                 {
-                    Guid userId = await CreateCanonicalLinkAndUserIfNotExist("oid", provider, kvp.Value.Username);
+                    Guid userId = await CreateCanonicalLinkAndUserIfNotExist(provider, kvp.Value.Username);
 
                     var authenticationResult = await Authenticate(
                         userId,
@@ -547,290 +537,6 @@ public class SSOController : ControllerBase
     }
 
     /// <summary>
-    /// This is the callback for the SAML flow. This creates a webpage to complete auth.
-    /// </summary>
-    /// <param name="provider">The provider that is calling back.</param>
-    /// <param name="relayState">
-    ///    RelayState given in the original saml request. If it is equal to "linking",
-    ///    We consider this to be a linking request.
-    /// </param>
-    /// <returns>A webpage that will complete the client-side flow.</returns>
-    [HttpPost("SAML/p/{provider}")]
-    [HttpPost("SAML/post/{provider}")]
-    public ActionResult SamlPost(string provider, [FromQuery] string relayState = null)
-    {
-        SamlConfig config;
-        try
-        {
-            config = SSOPlugin.Instance.Configuration.SamlConfigs[provider];
-        }
-        catch (KeyNotFoundException)
-        {
-            return BadRequest("No matching provider found");
-        }
-
-        bool isLinking = relayState == "linking";
-
-        _logger.LogInformation(
-            $"SAML request has relayState of {relayState}");
-
-        if (config.Enabled)
-        {
-            var samlResponse = new Response(config.SamlCertificate, Request.Form["SAMLResponse"]);
-
-            if (!samlResponse.IsValid())
-            {
-                return Problem("Invalid SAML signature");
-            }
-
-            bool valid = false;
-
-            // If no roles are configured, don't use RBAC
-            if (config.Roles.Length == 0)
-            {
-                valid = true;
-            }
-
-            // Check if user is allowed to log in based on roles
-            foreach (string role in samlResponse.GetCustomAttributes("Role"))
-            {
-                foreach (string allowedRole in config.Roles)
-                {
-                    if (allowedRole.Equals(role))
-                    {
-                        valid = true;
-                    }
-                }
-            }
-
-            if (valid)
-            {
-                return Content(
-                        WebResponse.Generator(
-                            data: Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(samlResponse.Xml)),
-                            provider: provider,
-                            baseUrl: GetRequestBase(config.SchemeOverride, config.PortOverride),
-                            mode: "SAML",
-                            isLinking: isLinking),
-                        MediaTypeNames.Text.Html);
-            }
-
-            _logger.LogWarning(
-                "SAML user: {UserId} has insufficient roles: {@Roles}. Expected any one of: {@ExpectedRoles}",
-                samlResponse.GetNameID(),
-                samlResponse.GetCustomAttributes("Role"),
-                config.Roles);
-            return ReturnError(StatusCodes.Status401Unauthorized, "Error. Check permissions.");
-        }
-
-        return ReturnError(StatusCodes.Status400BadRequest, "No active providers found");
-    }
-
-    /// <summary>
-    /// Initializes the SAML flow. This will redirect the user to the SAML provider.
-    /// </summary>
-    /// <param name="provider">The provider to being the flow with.</param>
-    /// <param name="isLinking">Whether this flow intends to link an account, or initiate auth.</param>
-    /// <returns>A redirect to the SAML provider's auth page.</returns>
-    [HttpGet("SAML/p/{provider}")]
-    [HttpGet("SAML/start/{provider}")]
-    public RedirectResult SamlChallenge(string provider, [FromQuery] bool isLinking = false)
-    {
-        SamlConfig config;
-        try
-        {
-            config = SSOPlugin.Instance.Configuration.SamlConfigs[provider];
-        }
-        catch (KeyNotFoundException)
-        {
-            throw new ArgumentException("Provider does not exist");
-        }
-
-        if (config.Enabled)
-        {
-            bool newPath = config.NewPath;
-            if (!isLinking)
-            {
-                newPath = Request.Path.Value.Contains("/start/", StringComparison.InvariantCultureIgnoreCase);
-                config.NewPath = newPath;
-            }
-
-            string redirectUri = GetRequestBase(config.SchemeOverride, config.PortOverride) + $"/sso/SAML/{(newPath ? "post" : "p")}/" + provider;
-            string relayState = null;
-            if (isLinking)
-            {
-                relayState = "linking";
-            }
-
-            var request = new AuthRequest(
-                config.SamlClientId.Trim(),
-                redirectUri);
-
-            return Redirect(request.GetRedirectUrl(config.SamlEndpoint.Trim(), relayState));
-        }
-
-        throw new ArgumentException("Provider does not exist");
-    }
-
-    /// <summary>
-    /// Adds a SAML configuration. If the provider already exists, overwrite it.
-    /// </summary>
-    /// <param name="provider">The provider name to add.</param>
-    /// <param name="newConfig">The SAML configuration object (deserialized) from JSON.</param>
-    /// <returns>The success result.</returns>
-    [Authorize(Policy = Policies.RequiresElevation)]
-    [HttpPost("SAML/Add/{provider}")]
-    public OkResult SamlAdd(string provider, [FromBody] SamlConfig newConfig)
-    {
-        var configuration = SSOPlugin.Instance.Configuration;
-        configuration.SamlConfigs[provider] = newConfig;
-        SSOPlugin.Instance.UpdateConfiguration(configuration);
-        return Ok();
-    }
-
-    /// <summary>
-    /// Deletes a provider from the configuration with a given ID.
-    /// </summary>
-    /// <param name="provider">The ID of the provider to delete.</param>
-    /// <returns>The success result.</returns>
-    [Authorize(Policy = Policies.RequiresElevation)]
-    [HttpGet("SAML/Del/{provider}")]
-    public OkResult SamlDel(string provider)
-    {
-        var configuration = SSOPlugin.Instance.Configuration;
-        configuration.SamlConfigs.Remove(provider);
-        SSOPlugin.Instance.UpdateConfiguration(configuration);
-        return Ok();
-    }
-
-    /// <summary>
-    /// Returns a list of all SAML providers configured. Requires administrator privileges.
-    /// </summary>
-    /// <returns>A list of all of the Saml providers available.</returns>
-    [Authorize(Policy = Policies.RequiresElevation)]
-    [HttpGet("SAML/Get")]
-    public ActionResult SamlProviders()
-    {
-        return Ok(SSOPlugin.Instance.Configuration.SamlConfigs);
-    }
-
-    /// <summary>
-    /// This endpoint accepts JSON and will authorize the user from the device values passed from the client.
-    /// </summary>
-    /// <param name="provider">The provider to authenticate against.</param>
-    /// <param name="response">The data passed to the client to ensure it is the right one.</param>
-    /// <returns>JSON for the client to populate information with.</returns>
-    [HttpPost("SAML/Auth/{provider}")]
-    [Consumes(MediaTypeNames.Application.Json)]
-    [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult> SamlAuth(string provider, [FromBody] AuthResponse response)
-    {
-        SamlConfig config;
-        try
-        {
-            config = SSOPlugin.Instance.Configuration.SamlConfigs[provider];
-        }
-        catch (KeyNotFoundException)
-        {
-            return BadRequest("No matching provider found");
-        }
-
-        if (config.Enabled)
-        {
-            bool isAdmin = false;
-            bool liveTv = config.EnableLiveTv;
-            bool liveTvManagement = config.EnableLiveTvManagement;
-            var samlResponse = new Response(config.SamlCertificate, response.Data);
-
-            if (!samlResponse.IsValid())
-            {
-                return Problem("Invalid SAML signature");
-            }
-
-            List<string> folders;
-            if (!config.EnableFolderRoles && config.EnabledFolders != null)
-            {
-                folders = new List<string>(config.EnabledFolders);
-            }
-            else
-            {
-                folders = new List<string>();
-            }
-
-            foreach (string role in samlResponse.GetCustomAttributes("Role"))
-            {
-                if (config.AdminRoles != null)
-                {
-                    foreach (string allowedRole in config.AdminRoles)
-                    {
-                        if (allowedRole.Equals(role))
-                        {
-                            isAdmin = true;
-                        }
-                    }
-                }
-
-                if (config.EnableFolderRoles)
-                {
-                    if (config.FolderRoleMapping != null)
-                    {
-                        foreach (FolderRoleMap folderRoleMap in config.FolderRoleMapping)
-                        {
-                            if (folderRoleMap.Role.Equals(role))
-                            {
-                                folders.AddRange(folderRoleMap.Folders);
-                            }
-                        }
-                    }
-                }
-
-                if (config.EnableLiveTvRoles)
-                {
-                    if (config.LiveTvRoles != null)
-                    {
-                        foreach (string allowedLiveTvRole in config.LiveTvRoles)
-                        {
-                            if (allowedLiveTvRole.Equals(role))
-                            {
-                                liveTv = true;
-                            }
-                        }
-                    }
-
-                    if (config.LiveTvManagementRoles != null)
-                    {
-                        foreach (string allowedLiveTvManagementRole in config.LiveTvManagementRoles)
-                        {
-                            if (allowedLiveTvManagementRole.Equals(role))
-                            {
-                                liveTvManagement = true;
-                            }
-                        }
-                    }
-                }
-            }
-
-            Guid userId = await CreateCanonicalLinkAndUserIfNotExist("saml", provider, samlResponse.GetNameID());
-
-            var authenticationResult = await Authenticate(
-                userId,
-                isAdmin,
-                config.EnableAuthorization,
-                config.EnableAllFolders,
-                folders.ToArray(),
-                liveTv,
-                liveTvManagement,
-                response,
-                config.DefaultProvider?.Trim(),
-                null)
-                .ConfigureAwait(false);
-            return Ok(authenticationResult);
-        }
-
-        return Problem("Something went wrong");
-    }
-
-    /// <summary>
     /// Removes a user from SSO auth and switches it back to another auth provider. Requires administrator privileges.
     /// </summary>
     /// <param name="username">The username to switch to the new provider.</param>
@@ -846,21 +552,9 @@ public class SSOController : ControllerBase
         return Ok();
     }
 
-    private SerializableDictionary<string, Guid> GetCanonicalLinks(string mode, string provider)
+    private SerializableDictionary<string, Guid> GetCanonicalLinks(string provider)
     {
-        SerializableDictionary<string, Guid> links = null;
-
-        switch (mode.ToLower())
-        {
-            case "saml":
-                links = SSOPlugin.Instance.Configuration.SamlConfigs[provider].CanonicalLinks;
-                break;
-            case "oid":
-                links = SSOPlugin.Instance.Configuration.OidConfigs[provider].CanonicalLinks;
-                break;
-            default:
-                throw new ArgumentException($"{mode} is not a valid choice between 'saml' and 'oid'");
-        }
+        var links = SSOPlugin.Instance.Configuration.OidConfigs[provider].CanonicalLinks;
 
         if (links == null)
         {
@@ -870,7 +564,7 @@ public class SSOController : ControllerBase
         return links;
     }
 
-    private async Task<Guid> CreateCanonicalLinkAndUserIfNotExist(string mode, string provider, string canonicalName)
+    private async Task<Guid> CreateCanonicalLinkAndUserIfNotExist(string provider, string canonicalName)
     {
         User user = null;
 
@@ -878,7 +572,7 @@ public class SSOController : ControllerBase
         Guid userId = Guid.Empty;
         try
         {
-            userId = GetCanonicalLink(mode, provider, canonicalName);
+            userId = GetCanonicalLink(provider, canonicalName);
         }
         catch (KeyNotFoundException)
         {
@@ -904,15 +598,15 @@ public class SSOController : ControllerBase
             user.Password = _cryptoProvider.CreatePasswordHash(Convert.ToBase64String(RandomNumberGenerator.GetBytes(64))).ToString();
 
             // Make sure there aren't any trailing existing links
-            var links = GetCanonicalLinks(mode, provider);
+            var links = GetCanonicalLinks(provider);
             links.Remove(canonicalName);
-            UpdateCanonicalLinkConfig(links, mode, provider);
+            UpdateCanonicalLinkConfig(links, provider);
         }
 
         userId = Guid.Empty;
         try
         {
-            userId = GetCanonicalLink(mode, provider, canonicalName);
+            userId = GetCanonicalLink(provider, canonicalName);
         }
         catch (KeyNotFoundException)
         {
@@ -923,18 +617,18 @@ public class SSOController : ControllerBase
         {
             _logger.LogInformation("SSO user link doesn't exist, creating...");
             userId = user.Id;
-            CreateCanonicalLink(mode, provider, userId, canonicalName);
+            CreateCanonicalLink(provider, userId, canonicalName);
         }
 
         return userId;
     }
 
-    private Guid GetCanonicalLink(string mode, string provider, string canonicalName)
+    private Guid GetCanonicalLink(string provider, string canonicalName)
     {
         SerializableDictionary<string, Guid> links = null;
         Guid userId = Guid.Empty;
 
-        links = GetCanonicalLinks(mode, provider);
+        links = GetCanonicalLinks(provider);
 
         userId = links[canonicalName];
 
@@ -944,92 +638,54 @@ public class SSOController : ControllerBase
     /// <summary>
     /// Create a canonical link for a given user. Must be performed by the user being changed, or admin.
     /// </summary>
-    /// <param name="mode">The mode of the function; SAML or OID.</param>
     /// <param name="provider">The name of the provider to link to a jellyfin account.</param>
     /// <param name="jellyfinUserId">The user ID within jellyfin to link to the provider.</param>
     /// <param name="authResponse">The client information to authenticate the user with.</param>
     /// <returns>Whether this API endpoint succeeded.</returns>
     [Authorize]
-    [HttpPost("{mode}/Link/{provider}/{jellyfinUserId}")]
+    [HttpPost("OID/Link/{provider}/{jellyfinUserId}")]
     [Consumes(MediaTypeNames.Application.Json)]
     [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult> AddCanonicalLink([FromRoute] string mode, [FromRoute] string provider, [FromRoute] Guid jellyfinUserId, [FromBody] AuthResponse authResponse)
+    public async Task<ActionResult> AddCanonicalLink([FromRoute] string provider, [FromRoute] Guid jellyfinUserId, [FromBody] AuthResponse authResponse)
     {
         if (!await RequestHelpers.AssertCanUpdateUser(_authContext, HttpContext.Request, jellyfinUserId, true).ConfigureAwait(false))
         {
             return StatusCode(StatusCodes.Status403Forbidden, "User is not allowed to link SSO providers.");
         }
 
-        switch (mode.ToLower())
-        {
-            case "saml":
-                return SamlLink(provider, jellyfinUserId, authResponse);
-            case "oid":
-                return OidLink(provider, jellyfinUserId, authResponse);
-            default:
-                throw new ArgumentException($"{mode} is not a valid choice between 'saml' and 'oid'");
-        }
+        return OidLink(provider, jellyfinUserId, authResponse);
     }
 
     /// <summary>
     /// Unregisters a given mapping from id within provider to user.
     /// </summary>
-    /// <param name="mode">The mode of the function; SAML or OID.</param>
     /// <param name="provider">The name of the provider from which the link should be removed.</param>
     /// <param name="jellyfinUserId">The user ID within jellyfin to unlink from the provider.</param>
     /// <param name="canonicalName">The user ID within jellyfin to unlink.</param>
     /// <returns>Whether this API endpoint succeeded.</returns>
     [Authorize]
-    [HttpDelete("{mode}/Link/{provider}/{jellyfinUserId}/{canonicalName}")]
+    [HttpDelete("OID/Link/{provider}/{jellyfinUserId}/{canonicalName}")]
     [Consumes(MediaTypeNames.Application.Json)]
     [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult> DeleteCanonicalLink([FromRoute] string mode, [FromRoute] string provider, [FromRoute] Guid jellyfinUserId, [FromRoute] string canonicalName)
+    public async Task<ActionResult> DeleteCanonicalLink([FromRoute] string provider, [FromRoute] Guid jellyfinUserId, [FromRoute] string canonicalName)
     {
         if (!await RequestHelpers.AssertCanUpdateUser(_authContext, HttpContext.Request, jellyfinUserId, true).ConfigureAwait(false))
         {
             return StatusCode(StatusCodes.Status403Forbidden, "Current user is not allowed to unlink SSO providers for user ID.");
         }
 
-        Guid linkedId = GetCanonicalLink(mode, provider, canonicalName);
+        Guid linkedId = GetCanonicalLink(provider, canonicalName);
 
         if (linkedId != jellyfinUserId)
         {
             return StatusCode(StatusCodes.Status409Conflict, "jellyfin UID does not match id registered to that canonical name.");
         }
 
-        var links = GetCanonicalLinks(mode, provider);
+        var links = GetCanonicalLinks(provider);
 
         links.Remove(canonicalName);
 
-        return UpdateCanonicalLinkConfig(links, mode, provider);
-    }
-
-    /// <summary>
-    /// Gets all the saml links for a user.
-    /// </summary>
-    /// <param name="jellyfinUserId">The user ID within jellyfin for which to return the links.</param>
-    /// <returns>A dictionary of provider : link mappings.</returns>
-    [Authorize]
-    [HttpGet("saml/links/{jellyfinUserId}")]
-    [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult<SerializableDictionary<string, IEnumerable<string>>>> GetSamlLinksByUser(Guid jellyfinUserId)
-    {
-        if (!await RequestHelpers.AssertCanUpdateUser(_authContext, HttpContext.Request, jellyfinUserId, true).ConfigureAwait(false))
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, "Non-admin is not allowed to query other user's mappings.");
-        }
-
-        var mappings = new SerializableDictionary<string, IEnumerable<string>>();
-        var providerList = SSOPlugin.Instance.Configuration.SamlConfigs;
-
-        foreach (var providerName in providerList.Keys)
-        {
-            var canonLinks = providerList[providerName].CanonicalLinks;
-            var canonKeys = from link in canonLinks where link.Value == jellyfinUserId select link.Key;
-            mappings[providerName] = canonKeys;
-        }
-
-        return mappings;
+        return UpdateCanonicalLinkConfig(links, provider);
     }
 
     /// <summary>
@@ -1061,42 +717,6 @@ public class SSOController : ControllerBase
     }
 
     /// <summary>
-    /// Validate a saml link request and create the link if it is valid.
-    /// </summary>
-    /// <param name="provider">The provider to authenticate against.</param>
-    /// <param name="jellyfinUserId">
-    ///   The ID of the account to be linked to the provider.
-    ///   Must be performed by this user, or an admin.
-    /// </param>
-    /// <param name="response">The data passed to the client to ensure it is the right one.</param>
-    /// <returns>JSON for the client to populate information with.</returns>
-    [Consumes(MediaTypeNames.Application.Json)]
-    [Produces(MediaTypeNames.Application.Json)]
-    private ActionResult SamlLink(string provider, Guid jellyfinUserId, AuthResponse response)
-    {
-        SamlConfig config;
-        try
-        {
-            config = SSOPlugin.Instance.Configuration.SamlConfigs[provider];
-        }
-        catch (KeyNotFoundException)
-        {
-            return BadRequest("No matching provider found");
-        }
-
-        var samlResponse = new Response(config.SamlCertificate, response.Data);
-
-        if (!samlResponse.IsValid())
-        {
-            return Problem("Invalid SAML signature");
-        }
-
-        string providerUserId = samlResponse.GetNameID();
-
-        return CreateCanonicalLink("saml", provider, jellyfinUserId, providerUserId);
-    }
-
-    /// <summary>
     /// Validate an OIDC link request and create the link if it is valid.
     /// </summary>
     /// <param name="provider">The provider to authenticate against.</param>
@@ -1125,19 +745,19 @@ public class SSOController : ControllerBase
             if (kvp.Value.State.State.Equals(response.Data) && kvp.Value.Valid)
             {
                 string providerUserId = kvp.Value.Username;
-                return CreateCanonicalLink("oid", provider, jellyfinUserId, providerUserId);
+                return CreateCanonicalLink(provider, jellyfinUserId, providerUserId);
             }
         }
 
         return Problem("Something went wrong!");
     }
 
-    private ActionResult CreateCanonicalLink(string mode, string provider, [FromRoute] Guid jellyfinUserId, string providerUserId)
+    private ActionResult CreateCanonicalLink(string provider, [FromRoute] Guid jellyfinUserId, string providerUserId)
     {
         SerializableDictionary<string, Guid> links = null;
         try
         {
-            links = GetCanonicalLinks(mode, provider);
+            links = GetCanonicalLinks(provider);
         }
         catch (KeyNotFoundException)
         {
@@ -1145,26 +765,15 @@ public class SSOController : ControllerBase
         }
 
         links[providerUserId] = jellyfinUserId;
-        UpdateCanonicalLinkConfig(links, mode, provider);
+        UpdateCanonicalLinkConfig(links, provider);
 
         return NoContent();
     }
 
-    private OkResult UpdateCanonicalLinkConfig(SerializableDictionary<string, Guid> links, string mode, string provider)
+    private OkResult UpdateCanonicalLinkConfig(SerializableDictionary<string, Guid> links, string provider)
     {
         var configuration = SSOPlugin.Instance.Configuration;
-        switch (mode.ToLower())
-        {
-            case "saml":
-                configuration.SamlConfigs[provider].CanonicalLinks = links;
-                break;
-            case "oid":
-                configuration.OidConfigs[provider].CanonicalLinks = links;
-                break;
-            default:
-                throw new ArgumentException($"{mode} is not a valid choice between 'saml' and 'oid'");
-        }
-
+        configuration.OidConfigs[provider].CanonicalLinks = links;
         SSOPlugin.Instance.UpdateConfiguration(configuration);
         return Ok();
     }
