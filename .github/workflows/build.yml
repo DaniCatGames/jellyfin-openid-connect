@@ -11,4 +11,4 @@ on:
 
 jobs:
   call:
-    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/build.yaml@master
+    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/build.yaml@c66b7d88b5febaa6dd685c13b60e5e2c1d3d01db # master
