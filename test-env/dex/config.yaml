@@ -16,12 +16,12 @@ staticClients:
     redirectURIs:
       - http://localhost:8096/sso/OID/redirect/dex
       - http://localhost:8096/sso/OID/redirect/dex-folderroles
+      - http://localhost:8096/sso/OID/redirect/dex-noauth
 
 enablePasswordDB: true
 
 # Password for every user below is the literal string "password".
-# Hash is bcrypt cost-10 of "password" — copy of the example hash from
-# https://github.com/dexidp/dex/blob/v2.45.1/examples/config-dev.yaml
+# Hash is bcrypt cost-10 of "password"
 staticPasswords:
   - email: admin@test.local
     hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
@@ -87,3 +87,14 @@ staticPasswords:
     userID: 00000000-0000-0000-0000-000000000006
     groups:
       - jellyfin-users
+
+  # No-authorization test: logs into the dex-noauth provider (enableAuthorization=false), which does
+  # no permission management at all.
+  - email: noauthuser@test.local
+    hash: "$2a$10$2b2cU8CPhOTaGrs1HRQuAueS7JTT5ZHsHSzYiFPm1leZck7Mc8T4W"
+    username: noauthuser
+    name: No Auth User
+    emailVerified: true
+    preferredUsername: noauthuser
+    userID: 00000000-0000-0000-0000-000000000007
+    groups: []
