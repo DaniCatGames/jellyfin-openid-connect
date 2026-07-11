@@ -2,35 +2,28 @@
 
 <p align="center">
 
-<img alt="Logo" src="https://raw.githubusercontent.com/eddymoulton/jellyfin-plugin-oidc/main/img/logo.png"/>
+<img alt="Logo" src="https://raw.githubusercontent.com/DaniCatGames/jellyfin-openid-connect/main/img/logo.png"/>
 <br/>
 <br/>
-<a href="https://github.com/eddymoulton/jellyfin-plugin-oidc">
-<img alt="GPL 3.0 License" src="https://img.shields.io/github/license/eddymoulton/jellyfin-plugin-oidc.svg"/>
+<a href="https://github.com/DaniCatGames/jellyfin-openid-connect">
+<img alt="GPL 3.0 License" src="https://img.shields.io/github/license/DaniCatGames/jellyfin-openid-connect.svg"/>
 </a>
-<a href="https://github.com/eddymoulton/jellyfin-plugin-oidc/actions/workflows/dotnet-test.yml">
-<img alt="GitHub Actions Build Status" src="https://github.com/eddymoulton/jellyfin-plugin-oidc/actions/workflows/dotnet-test.yml/badge.svg"/>
+<a href="https://github.com/DaniCatGames/jellyfin-openid-connect/actions/workflows/dotnet-test.yml">
+<img alt="GitHub Actions Build Status" src="https://github.com/DaniCatGames/jellyfin-openid-connect/actions/workflows/dotnet-test.yml/badge.svg"/>
 </a>
-<a href="https://github.com/eddymoulton/jellyfin-plugin-oidc/actions/workflows/publish-unstable.yml">
-<img alt="Unstable Build Status" src="https://github.com/eddymoulton/jellyfin-plugin-oidc/actions/workflows/publish-unstable.yml/badge.svg"/>
+<a href="https://github.com/DaniCatGames/jellyfin-openid-connect/actions/workflows/publish-unstable.yml">
+<img alt="Unstable Build Status" src="https://github.com/DaniCatGames/jellyfin-openid-connect/actions/workflows/publish-unstable.yml/badge.svg"/>
 </a>
-<a href="https://github.com/eddymoulton/jellyfin-plugin-oidc/releases">
-<img alt="Current Release" src="https://img.shields.io/github/release/eddymoulton/jellyfin-plugin-oidc.svg"/>
+<a href="https://github.com/DaniCatGames/jellyfin-openid-connect/releases">
+<img alt="Current Release" src="https://img.shields.io/github/release/DaniCatGames/jellyfin-openid-connect.svg"/>
 </a>
-<a href="https://github.com/eddymoulton/jellyfin-plugin-oidc/releases.atom">
+<a href="https://github.com/DaniCatGames/jellyfin-openid-connect/releases.atom">
 <img alt="Release RSS Feed" src="https://img.shields.io/badge/rss-releases-ffa500?logo=rss" />
 </a>
-<a href="https://github.com/eddymoulton/jellyfin-plugin-oidc/commits/main.atom">
+<a href="https://github.com/DaniCatGames/jellyfin-openid-connect/commits/main.atom">
 <img alt="Main Commits RSS Feed" src="https://img.shields.io/badge/rss-commits-ffa500?logo=rss" />
 </a>
 </p>
-
-> [!WARNING]
-> No longer maintained.
-> 
-> I haven't yet found a place for Jellyfin in my stack, so I'm not using this plugin day to day.
->
-> Please feel free to take any of the changes I've made into future forks. 
 
 This plugin allows users to sign in through an SSO provider (such as Google, Microsoft, or your own provider). This enables one-click signin.
 
@@ -42,7 +35,7 @@ Existing users may link new SSO accounts, or remove existing links using self-se
 
 This is 100% alpha software! PRs are welcome to improve the code.
 
-**This is for Jellyfin >=10.11 and only on the Web UI or clients supporting [Quick Connect](https://jellyfin.org/docs/general/server/quick-connect)**
+**This is for Jellyfin >=12.0 and only on the Web UI or clients supporting [Quick Connect](https://jellyfin.org/docs/general/server/quick-connect)**
 
 ## Tested Providers
 
@@ -65,10 +58,10 @@ While the above providers are apprently working, I personally only use Authentik
 Add the stable package repository to your Jellyfin plugin repositories (**Dashboard → Plugins → Repositories → +**):
 
 ```
-https://raw.githubusercontent.com/eddymoulton/jellyfin-plugin-oidc/manifest-stable/manifest.json
+https://raw.githubusercontent.com/DaniCatGames/jellyfin-openid-connect/manifest-stable/manifest.json
 ```
 
-Then install **OIDC Authentication** from the plugin catalog.
+Then install **openid-connect** from the plugin catalog.
 
 ### Unstable builds
 
@@ -77,7 +70,7 @@ If you're impatient/brave/feel like helping us test things out, you can opt into
 Add the unstable repository instead of (or alongside) the stable one:
 
 ```
-https://raw.githubusercontent.com/eddymoulton/jellyfin-plugin-oidc/manifest-unstable/manifest.json
+https://raw.githubusercontent.com/DaniCatGames/jellyfin-openid-connect/manifest-unstable/manifest.json
 ```
 
 Unstable builds may have new features unavailable in stable, but **be warned**: things change frequently, may break, and you could lose data. They are not intended for production use.
@@ -104,7 +97,7 @@ For building from source and releasing, see [docs/building.md](docs/building.md)
 
 # Credits and Thanks
 
-Credit to [9p4's jellyfin-plugin-sso](https://github.com/9p4/jellyfin-plugin-sso) for forming a solid base to build this off.
+Credit to [9p4's jellyfin-plugin-sso](https://github.com/9p4/jellyfin-plugin-sso) and [eddymoulton's fork](https://github.com/eddymoulton/jellyfin-plugin-oidc) for forming a solid base to build this off.
 
 I've taken the fork to continue maintaining for my own use, along with removing excess functionality that I did not want to maintain.
 

@@ -8,7 +8,7 @@ A `package.json` in the repo root provides the formatting tooling (Prettier). Ru
 
 ## Building
 
-This is built with .NET 9.0. Build with `dotnet publish .` for the debug release in the `SSO-Auth` directory. Copy over the `IdentityModel.OidcClient.dll`, the `IdentityModel.dll` and the `SSO-Auth.dll` files in the `/bin/Debug/net9.0/publish` directory to a new folder in your Jellyfin configuration: `config/plugins/sso`.
+This is built with .NET 9.0. Build with `dotnet publish .` from the plugin project directory. Copy over the `IdentityModel.OidcClient.dll`, the `IdentityModel.dll` and the `openid-connect.dll` files in the `/bin/Debug/net9.0/publish` directory to a new folder in your Jellyfin configuration.
 
 ### VSCode Workflow
 

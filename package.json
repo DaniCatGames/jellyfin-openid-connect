@@ -1,5 +1,5 @@
 {
-  "name": "jellyfin-plugin-oidc",
+  "name": "openid-connect",
   "version": "1.0.0",
   "private": true,
   "description": "Formatting tooling for the Jellyfin OIDC plugin web assets and docs",

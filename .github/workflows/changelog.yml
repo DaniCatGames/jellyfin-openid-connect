@@ -10,6 +10,6 @@ jobs:
   call:
     uses: jellyfin/jellyfin-meta-plugins/.github/workflows/changelog.yaml@c66b7d88b5febaa6dd685c13b60e5e2c1d3d01db # master
     with:
-      repository-name: eddymoulton/jellyfin-plugin-oidc
+      repository-name: DaniCatGames/jellyfin-openid-connect
     secrets:
       token: ${{ secrets.RELEASE_PAT }}

@@ -1,47 +1,18 @@
-name: "OIDC Authentication"
-guid: "EF25B893-BA73-4444-928C-01CD0E695AD4"
-imageUrl: "https://raw.githubusercontent.com/eddymoulton/jellyfin-plugin-oidc/main/img/logo.png"
+name: "OpenID Connect"
+guid: "3B621017-67A3-461E-A820-21622C591827"
+imageUrl: "https://raw.githubusercontent.com/DaniCatGames/jellyfin-openid-connect/main/img/logo.png"
 version: 1
-targetAbi: "10.11.0.0"
-framework: "net9.0"
-owner: "eddymoulton"
+targetAbi: "12.0.0.0"
+framework: "net10.0"
+owner: "DaniCatGames"
 overview: "Authenticate users against an OIDC provider."
 description: |
   This plugin allows users to sign in through an OIDC provider (such as Google, Facebook, or your own provider). This enables one-click signin.
-  Review documentation at https://github.com/eddymoulton/jellyfin-plugin-oidc
+  Review documentation at https://github.com/DaniCatGames/jellyfin-openid-connect
 category: "Authentication"
 artifacts:
-  - "SSO-Auth.dll"
+  - "openid-connect.dll"
   - "Duende.IdentityModel.OidcClient.dll"
   - "Duende.IdentityModel.dll"
 changelog: |-
-  - test: assert that users are added without library access (#30) @eddymoulton
-  - Update xunit-dotnet monorepo to 2.9.3 (#8) @[renovate[bot]](https://github.com/apps/renovate)
-
-  ### Bug Fixes ###
-  - fix: create users without authz to library folders (#29) @athendrix
-  - fix: correctly assign admin permissions (#27) @eddymoulton
-
-  ### Code or Repo Maintenance ###
-  - chore(deps): update dotnet monorepo to v9.0.315 (#32) @[renovate[bot]](https://github.com/apps/renovate)
-  - chore(deps): update dorny/test-reporter digest to a43b3a5 (#31) @[renovate[bot]](https://github.com/apps/renovate)
-  - chore(deps): update github artifact actions to v8 (#34) @[renovate[bot]](https://github.com/apps/renovate)
-
-  ### Documentation updates ###
-  - docs: update for this fork (#28) @eddymoulton
-  - fix: correctly assign admin permissions (#27) @eddymoulton
-  - ci: update release process (#19) @eddymoulton
-
-  ### CI & build changes ###
-  - chore(deps): update dorny/test-reporter digest to a43b3a5 (#31) @[renovate[bot]](https://github.com/apps/renovate)
-  - chore(deps): update github artifact actions to v8 (#34) @[renovate[bot]](https://github.com/apps/renovate)
-  - docs: update for this fork (#28) @eddymoulton
-  - Update actions/setup-dotnet action to v5 (#13) @[renovate[bot]](https://github.com/apps/renovate)
-  - Update GitHub Artifact Actions to v7 (#18) @[renovate[bot]](https://github.com/apps/renovate)
-  - Update actions/checkout action to v6 (#12) @[renovate[bot]](https://github.com/apps/renovate)
-  - Pin dependencies (#21) @[renovate[bot]](https://github.com/apps/renovate)
-  - Update actions/setup-node action to v6 (#25) @[renovate[bot]](https://github.com/apps/renovate)
-  - Update dependency node to v24 (#26) @[renovate[bot]](https://github.com/apps/renovate)
-  - ci: update release process (#19) @eddymoulton
-  - Pin dependencies (#2) @[renovate[bot]](https://github.com/apps/renovate)
-  - Configure Renovate (#1) @[renovate[bot]](https://github.com/apps/renovate)
+  - Update to Jellyfin 12.0

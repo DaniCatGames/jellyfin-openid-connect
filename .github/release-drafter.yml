@@ -20,8 +20,6 @@ categories:
     labels: [enhancement, feature]
   - title: ":bug: Bug Fixes"
     labels: [bug, fix, bugfix, regression]
-  - title: ":white_check_mark: Tests"
-    labels: [test, tests]
   - title: ":gear: Code or Repo Maintenance"
     labels: [chore, cleanup]
   - title: ":memo: Documentation updates"
