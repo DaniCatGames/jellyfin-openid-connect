@@ -25,7 +25,7 @@ jobs:
           echo "name=oidconnect-${branch}-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Build plugin
-        id: jprmons/checkout@9c091bb
+        id: jprm
         uses: oddstr13/jellyfin-plugin-repository-manager@9497a0a499416cc572ed2e07a391d9f943a37b4d # v1.1.1
         with:
           dotnet-target: net10.0

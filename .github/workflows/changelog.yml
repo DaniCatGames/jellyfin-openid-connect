@@ -12,4 +12,4 @@ jobs:
     with:
       repository-name: DaniCatGames/jellyfin-openid-connect
     secrets:
-      token: ${{ secrets.RELEASE_PAT }}
+      token: ${{ secrets.GITHUB_TOKEN }}

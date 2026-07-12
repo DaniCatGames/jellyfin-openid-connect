@@ -6,6 +6,8 @@ on:
 
 jobs:
   call:
+    permissions:
+      pull-requests: write
     uses: jellyfin/jellyfin-meta-plugins/.github/workflows/autolabel.yaml@c66b7d88b5febaa6dd685c13b60e5e2c1d3d01db # master
     with:
       repository-name: DaniCatGames/jellyfin-plugin-oidc
