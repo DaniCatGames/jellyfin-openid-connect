@@ -39,7 +39,7 @@ const ssoConfigLinking = {
             //provider_link.classList.add("sso-provider-" + provider_name_css);
             add_provider.classList.add("sso-provider");
 
-            add_provider.href = ApiClient.getUrl(`/OpenIDConnect/p/${provider_name}?isLinking=true`);
+            add_provider.href = ApiClient.getUrl(`/OpenIDConnect/start/${provider_name}?isLinking=true`);
 
             container.appendChild(provider_config);
         });

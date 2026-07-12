@@ -60,7 +60,7 @@ identity_providers:
         token_endpoint_auth_method: client_secret_post
         authorization_policy: one_factor
         redirect_uris:
-          - https://jellyfin.example.com/sso/OID/redirect/authelia
+          - https://jellyfin.example.com/OpenIDConnect/redirect/authelia
 ```
 
 ### Authelia v4.37 and below
@@ -76,7 +76,7 @@ identity_providers:
         secret: <redacted>
         authorization_policy: one_factor
         redirect_uris:
-          - https://jellyfin.example.com/sso/OID/redirect/authelia
+          - https://jellyfin.example.com/OpenIDConnect/redirect/authelia
 ```
 
 ### Jellyfin's Config
@@ -138,7 +138,7 @@ Now we can add this property mapping to authentik's Jellyfin OAuth provider:
   ![image](../img/authentik-config-04.jpg)
 
 - Edit / Update your Jellyfin OAuth provider
-- Verify your **"Redirect URIs/Origins (RegEx)"** follows the format: `https://domain.tld/sso/OID/redirect/Authentik`.
+- Verify your **"Redirect URIs/Origins (RegEx)"** follows the format: `https://jellyfin.example.com/OpenIDConnect/redirect/Authentik`.
 - Under **"Advanced Protocol Settings"**, add the **Group Membership** Scope
 
   ![image](../img/authentik-config-05.jpg)
@@ -166,15 +166,15 @@ Keycloak in general is a little more complicated than other providers. Ensure th
 
 ### Keycloak's Config
 
-Create a new Keycloak `openid-connect` application. Set the root URL to your Jellyfin URL (ie https://myjellyfin.example.com)
+Create a new Keycloak `openid-connect` application. Set the root URL to your Jellyfin URL (ie https://jellyfin.example.com)
 
 Ensure that the following configuration options are set:
 
 - Access Type: Confidential
 - Standard Flow Enabled
-- Redirect URI: https://myjellyfin.example.com/sso/OID/redirect/PROVIDER_NAME
+- Redirect URI: https://jellyfin.example.com/OpenIDConnect/redirect/PROVIDER_NAME
 - Redirect URI (for Android app): org.jellyfin.mobile://login-callback
-- Base URL: https://myjellyfin.example.com
+- Base URL: https://jellyfin.example.com
 
 Press the "Save" button at the bottom of the page and open the "Credentials" tab. Note down the secret.
 
@@ -194,10 +194,6 @@ keycloak:
   RoleClaim: <same-as-token-claim-name>
 ```
 
-## Keycloak SAML
-
-SAML support was removed to reduce the surface area of the plugin. This plugin now supports OpenID Connect only; use [Keycloak OIDC](#keycloak-oidc) instead.
-
 ## Pocket ID
 
 A simple and easy-to-use OIDC provider that allows users to authenticate with their passkeys to your services.
@@ -209,7 +205,7 @@ A simple and easy-to-use OIDC provider that allows users to authenticate with th
 1. Click `Add OCID Client`
 1. Give the client a name e.g. `Jellyfin`
 1. Set the `Clent Launch URL` to your Jellyfin endpoint
-1. Set the callbak url to `https://jellyfin.example.com/sso/OID/redirect/pocketid`. The `pocketid` part must match the `Name of OpenID Provider` in the Jellyfin SSO provider
+1. Set the callbak url to `https://jellyfin.example.com/OpenIDConnect/redirect/pocketid`. The `pocketid` part must match the `Name of OpenID Provider` in the Jellyfin SSO provider
 1. (optional) Enable PKCE if Jellyfin is an https endpoint
 1. (optional) Set a logo
 1. (optional) Set `Allowed User Groups`
@@ -240,8 +236,7 @@ kanidm system oauth2 create jellyfin "Jellyfin" https://jellyfin.example.com/
 # Set this to drop the trailing @idm.example.com in usernames
 kanidm system oauth2 prefer-short-username jellyfin
 
-kanidm system oauth2 add-redirect-url jellyfin https://jellyfin.example.com/sso/OID/redirect/kanidm
-kanidm system oauth2 add-redirect-url jellyfin https://jellyfin.example.com/sso/OID/r/kanidm
+kanidm system oauth2 add-redirect-url jellyfin https://jellyfin.example.com/OpenIDConnect/redirect/kanidm
 
 # Optionally setup groups for Jellyfin
 kanidm group create jellyfin_admins
