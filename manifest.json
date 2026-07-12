@@ -6,7 +6,16 @@
         "overview": "Authenticate users against an OIDC provider.",
         "owner": "DaniCatGames",
         "category": "Authentication",
+        "imageUrl": "https://raw.githubusercontent.com/DaniCatGames/jellyfin-openid-connect/main/img/logo.png",
         "versions": [
+            {
+                "version": "1.2607.4.0",
+                "changelog": "- Update to Jellyfin 12.0",
+                "targetAbi": "12.0.0.0",
+                "sourceUrl": "https://github.com/DaniCatGames/jellyfin-openid-connect/releases/download/unstable/openid-connect_1.2607.4.0.zip",
+                "checksum": "833fb8bde3ddc4333e7017ea2986d471",
+                "timestamp": "2026-07-12T10:39:30Z"
+            },
             {
                 "version": "1.2607.3.0",
                 "changelog": "- Update to Jellyfin 12.0",
@@ -15,7 +24,6 @@
                 "checksum": "a0eb9f45e5ce8988cfcf61eca4dfeffa",
                 "timestamp": "2026-07-12T09:49:52Z"
             }
-        ],
-        "imageUrl": "https://raw.githubusercontent.com/DaniCatGames/jellyfin-openid-connect/main/img/logo.png"
+        ]
     }
 ]
