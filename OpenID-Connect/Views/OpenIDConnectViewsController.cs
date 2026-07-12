@@ -9,29 +9,29 @@ using MediaBrowser.Model.Plugins;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 
-namespace Jellyfin.Plugin.OIDConnect.Views;
+namespace Jellyfin.Plugin.OpenIDConnect.Views;
 
 /// <summary>
 ///     The sso views controller.
 /// </summary>
 [ApiController]
 [Route("[controller]")]
-public class OIDConnectViewsController : ControllerBase
+public class OpenIDConnectViewsController : ControllerBase
 {
     private readonly IAuthorizationContext _authContext;
-    private readonly ILogger<OIDConnectViewsController> _logger;
+    private readonly ILogger<OpenIDConnectViewsController> _logger;
     private readonly ISessionManager _sessionManager;
     private readonly IUserManager _userManager;
 
     /// <summary>
-    ///     Initializes a new instance of the <see cref="OIDConnectViewsController" /> class.
+    ///     Initializes a new instance of the <see cref="OpenIDConnectViewsController" /> class.
     /// </summary>
-    /// <param name="logger">Instance of the <see cref="ILogger{SSOViewsController}" /> interface.</param>
+    /// <param name="logger">Instance of the <see cref="ILogger{OpenIDConnectViewsController}" /> interface.</param>
     /// <param name="sessionManager">Instance of the <see cref="ISessionManager" /> interface.</param>
     /// <param name="authContext">Instance of the <see cref="IAuthorizationContext" /> interface.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager" /> interface.</param>
-    public OIDConnectViewsController(
-        ILogger<OIDConnectViewsController> logger,
+    public OpenIDConnectViewsController(
+        ILogger<OpenIDConnectViewsController> logger,
         ISessionManager sessionManager,
         IUserManager userManager,
         IAuthorizationContext authContext)
@@ -40,18 +40,18 @@ public class OIDConnectViewsController : ControllerBase
         _userManager = userManager;
         _authContext = authContext;
         _logger = logger;
-        _logger.LogInformation("SSO Views Controller initialized");
+        _logger.LogInformation("OpenID Connect Views Controller initialized");
     }
 
     private ActionResult ServeView(string viewName)
     {
         IEnumerable<PluginPageInfo> pages = null;
-        if (OIDConnect.Instance == null)
+        if (OpenIDConnect.Instance == null)
         {
             return BadRequest("No plugin instance found");
         }
 
-        pages = OIDConnect.Instance.GetViews();
+        pages = OpenIDConnect.Instance.GetViews();
 
         PluginPageInfo view = pages.FirstOrDefault(pageInfo => pageInfo.Name == viewName, null);
 
@@ -60,7 +60,7 @@ public class OIDConnectViewsController : ControllerBase
             return NotFound("No matching view found");
         }
 #nullable enable
-        Stream? stream = OIDConnect.Instance.GetType().Assembly.GetManifestResourceStream(view.EmbeddedResourcePath);
+        Stream? stream = OpenIDConnect.Instance.GetType().Assembly.GetManifestResourceStream(view.EmbeddedResourcePath);
 
         if (stream == null)
         {

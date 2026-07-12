@@ -3,7 +3,7 @@ using System.Xml;
 using System.Xml.Schema;
 using System.Xml.Serialization;
 
-namespace Jellyfin.Plugin.OIDConnect;
+namespace Jellyfin.Plugin.OpenIDConnect;
 
 /// <summary>
 ///     For some reason, the generic Dictionary in .net 2.0 is not XML serializable. The following code snippet is a xml

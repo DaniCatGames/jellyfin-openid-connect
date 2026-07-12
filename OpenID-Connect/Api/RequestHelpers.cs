@@ -15,7 +15,7 @@ using Jellyfin.Database.Implementations.Enums;
 using MediaBrowser.Controller.Net;
 using Microsoft.AspNetCore.Http;
 
-namespace Jellyfin.Plugin.OIDConnect.Api;
+namespace Jellyfin.Plugin.OpenIDConnect.Api;
 
 /// <summary>
 ///     Request Extensions.

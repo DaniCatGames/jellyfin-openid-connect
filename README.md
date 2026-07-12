@@ -8,28 +8,18 @@
 <a href="https://github.com/DaniCatGames/jellyfin-openid-connect">
 <img alt="GPL 3.0 License" src="https://img.shields.io/github/license/DaniCatGames/jellyfin-openid-connect.svg"/>
 </a>
-<a href="https://github.com/DaniCatGames/jellyfin-openid-connect/actions/workflows/dotnet-test.yml">
-<img alt="GitHub Actions Build Status" src="https://github.com/DaniCatGames/jellyfin-openid-connect/actions/workflows/dotnet-test.yml/badge.svg"/>
-</a>
 <a href="https://github.com/DaniCatGames/jellyfin-openid-connect/actions/workflows/publish-unstable.yml">
 <img alt="Unstable Build Status" src="https://github.com/DaniCatGames/jellyfin-openid-connect/actions/workflows/publish-unstable.yml/badge.svg"/>
 </a>
 <a href="https://github.com/DaniCatGames/jellyfin-openid-connect/releases">
 <img alt="Current Release" src="https://img.shields.io/github/release/DaniCatGames/jellyfin-openid-connect.svg"/>
 </a>
-<a href="https://github.com/DaniCatGames/jellyfin-openid-connect/releases.atom">
-<img alt="Release RSS Feed" src="https://img.shields.io/badge/rss-releases-ffa500?logo=rss" />
-</a>
-<a href="https://github.com/DaniCatGames/jellyfin-openid-connect/commits/main.atom">
-<img alt="Main Commits RSS Feed" src="https://img.shields.io/badge/rss-commits-ffa500?logo=rss" />
-</a>
-</p>
 
 This plugin allows users to sign in through an SSO provider (such as Google, Microsoft, or your own provider). This enables one-click signin.
 
 https://user-images.githubusercontent.com/17993169/149681516-f93b43f5-fa5c-4c1f-a909-e5414878a864.mp4
 
-Existing users may link new SSO accounts, or remove existing links using self-service at `/SSOViews/linking`.
+Existing users may link new SSO accounts, or remove existing links using self-service at `/OpenIDConnect/linking`.
 
 ## Current State
 

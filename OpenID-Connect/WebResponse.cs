@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Jellyfin.Plugin.OIDConnect;
+namespace Jellyfin.Plugin.OpenIDConnect;
 
 /// <summary>
 ///     A helper class to return HTML for the client's auth flow.

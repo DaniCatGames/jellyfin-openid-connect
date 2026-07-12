@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Xml.Serialization;
 using MediaBrowser.Model.Plugins;
 
-namespace Jellyfin.Plugin.OIDConnect.Config;
+namespace Jellyfin.Plugin.OpenIDConnect.Config;
 
 /// <summary>
 ///     Plugin Configuration.

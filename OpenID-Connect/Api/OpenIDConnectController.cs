@@ -12,7 +12,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Duende.IdentityModel.OidcClient;
 using Jellyfin.Database.Implementations.Entities;
-using Jellyfin.Plugin.OIDConnect.Config;
+using Jellyfin.Plugin.OpenIDConnect.Config;
 using MediaBrowser.Common.Api;
 using MediaBrowser.Controller.Authentication;
 using MediaBrowser.Controller.Configuration;
@@ -29,7 +29,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 
-namespace Jellyfin.Plugin.OIDConnect.Api;
+namespace Jellyfin.Plugin.OpenIDConnect.Api;
 
 /// <summary>
 ///     The sso api controller.
@@ -102,7 +102,7 @@ public class OpenIDConnectController : ControllerBase
         OidConfig config;
         try
         {
-            config = OIDConnect.Instance.Configuration.OidConfigs[provider];
+            config = OpenIDConnect.Instance.Configuration.OidConfigs[provider];
         }
         catch (KeyNotFoundException)
         {
@@ -379,7 +379,7 @@ public class OpenIDConnectController : ControllerBase
         OidConfig config;
         try
         {
-            config = OIDConnect.Instance.Configuration.OidConfigs[provider];
+            config = OpenIDConnect.Instance.Configuration.OidConfigs[provider];
         }
         catch (KeyNotFoundException)
         {
@@ -456,9 +456,9 @@ public class OpenIDConnectController : ControllerBase
     [HttpPost("OID/Add/{provider}")]
     public void OidAdd(string provider, [FromBody] OidConfig config)
     {
-        PluginConfiguration configuration = OIDConnect.Instance.Configuration;
+        PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
         configuration.OidConfigs[provider] = config;
-        OIDConnect.Instance.UpdateConfiguration(configuration);
+        OpenIDConnect.Instance.UpdateConfiguration(configuration);
     }
 
     /// <summary>
@@ -469,9 +469,9 @@ public class OpenIDConnectController : ControllerBase
     [HttpGet("OID/Del/{provider}")]
     public void OidDel(string provider)
     {
-        PluginConfiguration configuration = OIDConnect.Instance.Configuration;
+        PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
         configuration.OidConfigs.Remove(provider);
-        OIDConnect.Instance.UpdateConfiguration(configuration);
+        OpenIDConnect.Instance.UpdateConfiguration(configuration);
     }
 
     /// <summary>
@@ -482,7 +482,7 @@ public class OpenIDConnectController : ControllerBase
     [HttpGet("OID/Get")]
     public ActionResult OidProviders()
     {
-        return Ok(OIDConnect.Instance.Configuration.OidConfigs);
+        return Ok(OpenIDConnect.Instance.Configuration.OidConfigs);
     }
 
     /// <summary>
@@ -492,7 +492,7 @@ public class OpenIDConnectController : ControllerBase
     [HttpGet("OID/GetNames")]
     public ActionResult OidProviderNames()
     {
-        return Ok(OIDConnect.Instance.Configuration.OidConfigs.Keys);
+        return Ok(OpenIDConnect.Instance.Configuration.OidConfigs.Keys);
     }
 
     /// <summary>
@@ -520,7 +520,7 @@ public class OpenIDConnectController : ControllerBase
         OidConfig config;
         try
         {
-            config = OIDConnect.Instance.Configuration.OidConfigs[provider];
+            config = OpenIDConnect.Instance.Configuration.OidConfigs[provider];
         }
         catch (KeyNotFoundException)
         {
@@ -574,7 +574,7 @@ public class OpenIDConnectController : ControllerBase
 
     private SerializableDictionary<string, Guid> GetCanonicalLinks(string provider)
     {
-        SerializableDictionary<string, Guid> links = OIDConnect.Instance.Configuration.OidConfigs[provider]
+        SerializableDictionary<string, Guid> links = OpenIDConnect.Instance.Configuration.OidConfigs[provider]
             .CanonicalLinks;
 
         if (links == null)
@@ -748,7 +748,7 @@ public class OpenIDConnectController : ControllerBase
         }
 
         var mappings = new SerializableDictionary<string, IEnumerable<string>>();
-        SerializableDictionary<string, OidConfig> providerList = OIDConnect.Instance.Configuration.OidConfigs;
+        SerializableDictionary<string, OidConfig> providerList = OpenIDConnect.Instance.Configuration.OidConfigs;
 
         foreach (string providerName in providerList.Keys)
         {
@@ -777,7 +777,7 @@ public class OpenIDConnectController : ControllerBase
         OidConfig config;
         try
         {
-            config = OIDConnect.Instance.Configuration.OidConfigs[provider];
+            config = OpenIDConnect.Instance.Configuration.OidConfigs[provider];
         }
         catch (KeyNotFoundException)
         {
@@ -816,9 +816,9 @@ public class OpenIDConnectController : ControllerBase
 
     private OkResult UpdateCanonicalLinkConfig(SerializableDictionary<string, Guid> links, string provider)
     {
-        PluginConfiguration configuration = OIDConnect.Instance.Configuration;
+        PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
         configuration.OidConfigs[provider].CanonicalLinks = links;
-        OIDConnect.Instance.UpdateConfiguration(configuration);
+        OpenIDConnect.Instance.UpdateConfiguration(configuration);
         return Ok();
     }
 

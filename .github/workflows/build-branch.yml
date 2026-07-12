@@ -22,7 +22,7 @@ jobs:
         id: meta
         run: |
           branch=$(echo "${GITHUB_REF_NAME}" | sed 's/[^a-zA-Z0-9.-]/_/g')
-          echo "name=oidconnect-${branch}-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "name=openid-connect-${branch}-$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
 
       - name: Build plugin
         id: jprm
