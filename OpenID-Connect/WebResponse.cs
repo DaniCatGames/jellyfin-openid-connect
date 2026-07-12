@@ -1,3 +1,4 @@
+using System;
 using System.Globalization;
 
 namespace Jellyfin.Plugin.OpenIDConnect;
@@ -416,7 +417,7 @@ const sleep = (milliseconds) => {
     {
         // Strip out the protocol (http:// or https://) and convert the domain to Punycode
         var idnMapping = new IdnMapping();
-        int protocolSeparatorIndex = baseUrl.IndexOf("//");
+        int protocolSeparatorIndex = baseUrl.IndexOf("//", StringComparison.InvariantCulture);
         string protocol = baseUrl.Substring(0, protocolSeparatorIndex + 2);
         string domain = baseUrl.Substring(protocolSeparatorIndex + 2);
         string punycodeDomain = idnMapping.GetAscii(domain);

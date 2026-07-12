@@ -99,268 +99,318 @@ public class OpenIDConnectController : ControllerBase
         [FromQuery] string state)
     {
         OidConfig config;
+
+        // If the config doesn't have an active provider matching the requeset, show an error
         try
         {
             config = OpenIDConnect.Instance.Configuration.OidConfigs[provider];
+
+            if (!config.Enabled)
+            {
+                throw new KeyNotFoundException();
+            }
         }
         catch (KeyNotFoundException)
         {
             return BadRequest("No matching provider found");
         }
 
-        if (config.Enabled)
+        if (string.IsNullOrEmpty(state))
         {
-            if (string.IsNullOrEmpty(state))
-            {
-                return BadRequest("Missing state");
-            }
+            return BadRequest("Missing state");
+        }
 
-            if (!StateManager.TryGetValue(state, out TimedAuthorizeState timedState))
-            {
-                return BadRequest("Invalid or expired state");
-            }
+        if (!StateManager.TryGetValue(state, out TimedAuthorizeState timedState))
+        {
+            return BadRequest("Invalid or expired state");
+        }
 
-            string[] scopes = config.OidScopes ?? new string[2];
-            var options = new OidcClientOptions
+        OidcClient oidcClient = CreateOidcClient(provider, config, out ActionResult configError);
+        if (configError != null)
+        {
+            return configError;
+        }
+
+        AuthorizeState currentState = timedState.State;
+        LoginResult result = await oidcClient.ProcessResponseAsync(Request.QueryString.Value, currentState)
+            .ConfigureAwait(false);
+
+        if (result.IsError)
+        {
+            return BadRequest($"Error logging in: {result.Error} - {result.ErrorDescription}");
+        }
+
+        if (!config.EnableFolderRoles && config.EnabledFolders != null)
+        {
+            timedState.Folders = new List<string>(config.EnabledFolders);
+        }
+        else
+        {
+            timedState.Folders = [];
+        }
+
+        timedState.EnableLiveTv = config.EnableLiveTv;
+        timedState.EnableLiveTvManagement = config.EnableLiveTvManagement;
+
+        if (config.AvatarUrlFormat is not null)
+        {
+            timedState.AvatarURL = result.User.Claims.Aggregate(
+                config.AvatarUrlFormat,
+                (s, claim) => s.Contains($"@{{{claim.Type}}}") ? s.Replace($"@{{{claim.Type}}}", claim.Value) : s);
+        }
+
+        foreach (Claim claim in result.User.Claims)
+        {
+            if (claim.Type == (config.DefaultUsernameClaim?.Trim() ?? "preferred_username"))
             {
-                Authority = config.OidEndpoint?.Trim(),
-                ClientId = config.OidClientId?.Trim(),
-                ClientSecret = config.OidSecret?.Trim(),
-                RedirectUri = GetRequestBase(config.SchemeOverride, config.PortOverride)
-                              + $"/OpenIDConnect/redirect/{provider}",
-                Scope = string.Join(" ", scopes.Prepend("openid profile")),
-                DisablePushedAuthorization = config.DisablePushedAuthorization,
-                LoggerFactory = _loggerFactory,
-                LoadProfile = !config.DoNotLoadProfile,
-                HttpClientFactory = o =>
+                timedState.Username = claim.Value;
+                if (config.Roles == null || config.Roles.Length == 0)
                 {
-                    HttpClient client = _httpClientFactory.CreateClient();
-                    var assembly = Assembly.GetExecutingAssembly();
-                    FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
-                    string version = fvi.FileVersion;
-                    client.DefaultRequestHeaders.UserAgent.ParseAdd(
-                        $"Jellyfin-Plugin-OpenID-Connect +{version} (https://github.com/DaniCatGames/jellyfin-openid-connect)");
-                    return client;
-                },
-            };
-            var oidEndpointUri = new Uri(config.OidEndpoint?.Trim());
-            options.Policy.Discovery.AdditionalEndpointBaseAddresses.Add(
-                oidEndpointUri.GetLeftPart(UriPartial.Authority));
-            options.Policy.Discovery.ValidateEndpoints =
-                !config.DoNotValidateEndpoints; // For Google and other providers with different endpoints
-            options.Policy.Discovery.RequireHttps = !config.DisableHttps;
-            options.Policy.Discovery.ValidateIssuerName = !config.DoNotValidateIssuerName;
-            var oidcClient = new OidcClient(options);
-            AuthorizeState currentState = timedState.State;
-            LoginResult result = await oidcClient.ProcessResponseAsync(Request.QueryString.Value, currentState)
-                .ConfigureAwait(false);
-
-            if (result.IsError)
-            {
-                return ReturnError(StatusCodes.Status400BadRequest,
-                    $"Error logging in: {result.Error} - {result.ErrorDescription}");
+                    timedState.Valid = true;
+                }
             }
 
-            if (!config.EnableFolderRoles && config.EnabledFolders != null)
-            {
-                timedState.Folders = new List<string>(config.EnabledFolders);
-            }
-            else
-            {
-                timedState.Folders = new List<string>();
-            }
+            // Role processing
+            // The regex matches any "." not preceded by a "\": a.b.c will be split into a, b, and c, but a.b\.c will be split into a, b.c (after processing the escaped dots)
+            // We have to first process the RoleClaim string
+            string[] segments = string.IsNullOrEmpty(config.RoleClaim)
+                ? Array.Empty<string>()
+                : Regex.Split(config.RoleClaim.Trim(), @"(?<!\\)\.");
 
-            timedState.EnableLiveTv = config.EnableLiveTv;
-            timedState.EnableLiveTvManagement = config.EnableLiveTvManagement;
-
-            if (config.AvatarUrlFormat is not null)
+            if (segments.Length == 0 || segments[0] == "")
             {
-                timedState.AvatarURL = result.User.Claims.Aggregate(
-                    config.AvatarUrlFormat,
-                    (s, claim) => s.Contains($"@{{{claim.Type}}}") ? s.Replace($"@{{{claim.Type}}}", claim.Value) : s);
+                continue;
             }
 
+            // Now we make sure that any escaped "."s ("\.") are replaced with "."
+            segments = segments.Select(i => i.Replace("\\.", ".")).ToArray();
+
+            // if current claim is configured role claim, process roles
+            if (claim.Type == segments[0])
+            {
+                ProcessRoles(segments, claim, config, timedState);
+            }
+        }
+
+        // If the provider doesn't support the preferred username claim, then use the sub claim
+        if (!timedState.Valid)
+        {
             foreach (Claim claim in result.User.Claims)
             {
-                if (claim.Type == (config.DefaultUsernameClaim?.Trim() ?? "preferred_username"))
+                if (claim.Type == "sub")
                 {
                     timedState.Username = claim.Value;
-                    if (config.Roles == null || config.Roles.Length == 0)
+                    if (config.Roles.Length == 0)
                     {
                         timedState.Valid = true;
                     }
                 }
-
-                // Role processing
-                // The regex matches any "." not preceded by a "\": a.b.c will be split into a, b, and c, but a.b\.c will be split into a, b.c (after processing the escaped dots)
-                // We have to first process the RoleClaim string
-                string[] segments = string.IsNullOrEmpty(config.RoleClaim)
-                    ? Array.Empty<string>()
-                    : Regex.Split(config.RoleClaim.Trim(), "(?<!\\\\)\\.");
-
-                if (segments.Any())
-                {
-                    // Now we make sure that any escaped "."s ("\.") are replaced with "."
-                    segments = segments.Select(i => i.Replace("\\.", ".")).ToArray();
-
-                    if (claim.Type == segments[0])
-                    {
-                        List<string> roles;
-                        // If we are not using JSON values, just use the raw info from the claim value
-                        if (segments.Length == 1)
-                        {
-                            roles = [claim.Value];
-                        }
-                        else
-                        {
-                            // We recursively traverse through the JSON data for the roles and parse it
-                            var json = JsonConvert.DeserializeObject<IDictionary<string, object>>(claim.Value);
-                            if (json is null)
-                            {
-                                roles = new List<string>();
-                            }
-                            else
-                            {
-                                bool missingSegment = false;
-                                for (int i = 1; i < segments.Length - 1; i++)
-                                {
-                                    string segment = segments[i];
-                                    if (!json.TryGetValue(segment, out object nextToken)
-                                        || nextToken is not JObject nextObject)
-                                    {
-                                        missingSegment = true;
-                                        break;
-                                    }
-
-                                    json = nextObject.ToObject<IDictionary<string, object>>();
-                                    if (json is null)
-                                    {
-                                        missingSegment = true;
-                                        break;
-                                    }
-                                }
-
-                                if (missingSegment || !json.TryGetValue(segments[^1], out object rolesToken)
-                                                   || rolesToken is not JArray rolesArray)
-                                {
-                                    roles = new List<string>();
-                                }
-                                else
-                                {
-                                    // The final step is to take the JSON and turn it from a dictionary into a string
-                                    roles = rolesArray.ToObject<List<string>>();
-                                }
-                            }
-                        }
-
-                        foreach (string role in roles)
-                        {
-                            // Check if allowed to login based on roles
-                            if (config.Roles != null && config.Roles.Any())
-                            {
-                                foreach (string validRoles in config.Roles)
-                                {
-                                    if (role.Equals(validRoles))
-                                    {
-                                        timedState.Valid = true;
-                                    }
-                                }
-                            }
-
-                            // Check if admin based on roles
-                            if (config.AdminRoles != null && config.AdminRoles.Any())
-                            {
-                                foreach (string validAdminRoles in config.AdminRoles)
-                                {
-                                    if (role.Equals(validAdminRoles))
-                                    {
-                                        timedState.Admin = true;
-                                    }
-                                }
-                            }
-
-                            // Get allowed folders from roles
-                            if (config.EnableFolderRoles)
-                            {
-                                foreach (FolderRoleMap folderRoleMap in config.FolderRoleMapping)
-                                {
-                                    if (role.Equals(folderRoleMap.Role?.Trim()))
-                                    {
-                                        timedState.Folders.AddRange(folderRoleMap.Folders);
-                                    }
-                                }
-                            }
-
-                            if (config.EnableLiveTvRoles)
-                            {
-                                // Check if allowed Live TV based on roles
-                                if (config.LiveTvRoles != null && config.LiveTvRoles.Any())
-                                {
-                                    foreach (string validLiveTvRoles in config.LiveTvRoles)
-                                    {
-                                        if (role.Equals(validLiveTvRoles))
-                                        {
-                                            timedState.EnableLiveTv = true;
-                                        }
-                                    }
-                                }
-
-                                // Check if allowed Live TV management based on roles
-                                if (config.LiveTvManagementRoles != null && config.LiveTvManagementRoles.Any())
-                                {
-                                    foreach (string validLiveTvManagementRoles in config.LiveTvManagementRoles)
-                                    {
-                                        if (role.Equals(validLiveTvManagementRoles))
-                                        {
-                                            timedState.EnableLiveTvManagement = true;
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
             }
-
-            // If the provider doesn't support the preferred username claim, then use the sub claim
-            if (!timedState.Valid)
-            {
-                foreach (Claim claim in result.User.Claims)
-                {
-                    if (claim.Type == "sub")
-                    {
-                        timedState.Username = claim.Value;
-                        if (config.Roles.Length == 0)
-                        {
-                            timedState.Valid = true;
-                        }
-                    }
-                }
-            }
-
-            bool isLinking = timedState.IsLinking;
-
-            if (timedState.Valid)
-            {
-                _logger.LogInformation($"Is request linking: {isLinking}");
-                return Content(WebResponse.Generator(state,
-                        provider,
-                        GetRequestBase(config.SchemeOverride, config.PortOverride),
-                        isLinking),
-                    MediaTypeNames.Text.Html);
-            }
-
-            _logger.LogWarning(
-                "OpenID user {Username} has one or more incorrect role claims: {@Claims}. Expected any one of: {@ExpectedClaims}",
-                timedState.Username,
-                result.User.Claims.Select(o => new { o.Type, o.Value }),
-                config.Roles);
-
-            return ReturnError(StatusCodes.Status401Unauthorized, "Error. Check permissions.");
         }
 
-        // If the config doesn't have an active provider matching the requeset, show an error
-        return BadRequest("No matching provider found");
+        bool isLinking = timedState.IsLinking;
+
+        if (timedState.Valid)
+        {
+            _logger.LogInformation($"Is request linking: {isLinking}");
+            return Content(WebResponse.Generator(state,
+                    provider,
+                    GetRequestBase(config.SchemeOverride, config.PortOverride),
+                    isLinking),
+                MediaTypeNames.Text.Html);
+        }
+
+        _logger.LogWarning(
+            "OpenID user {Username} has one or more incorrect role claims: {@Claims}. Expected any one of: {@ExpectedClaims}",
+            timedState.Username,
+            result.User.Claims.Select(o => new { o.Type, o.Value }),
+            config.Roles);
+
+        return ReturnError(StatusCodes.Status401Unauthorized, "Error. Check permissions.");
+    }
+
+    private OidcClient CreateOidcClient(string provider, OidConfig config, out ActionResult configError)
+    {
+        string endpoint = config.OidEndpoint.Trim();
+        if (string.IsNullOrEmpty(endpoint))
+        {
+            configError = BadRequest("No IdP endpoint configured for provider");
+            return null;
+        }
+
+        string clientId = config.OidClientId.Trim();
+        if (string.IsNullOrEmpty(clientId))
+        {
+            configError = BadRequest("No client ID configured for provider");
+            return null;
+        }
+
+        string clientSecret = config.OidSecret.Trim();
+        if (string.IsNullOrEmpty(clientSecret))
+        {
+            configError = BadRequest("No client secret configured for provider");
+            return null;
+        }
+
+        configError = null;
+
+        string[] scopes = config.OidScopes ?? new string[2];
+        var options = new OidcClientOptions
+        {
+            Authority = endpoint,
+            ClientId = clientId,
+            ClientSecret = clientSecret,
+            RedirectUri = GetRequestBase(config.SchemeOverride, config.PortOverride)
+                          + $"/OpenIDConnect/redirect/{provider}",
+            Scope = string.Join(" ", scopes.Prepend("openid profile")),
+            DisablePushedAuthorization = config.DisablePushedAuthorization,
+            LoggerFactory = _loggerFactory,
+            LoadProfile = !config.DoNotLoadProfile,
+            HttpClientFactory = _ =>
+            {
+                HttpClient client = _httpClientFactory.CreateClient();
+                var assembly = Assembly.GetExecutingAssembly();
+                FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
+                string version = fvi.FileVersion;
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                    $"Jellyfin-Plugin-OpenID-Connect +{version} (https://github.com/DaniCatGames/jellyfin-openid-connect)");
+                return client;
+            },
+            Policy =
+            {
+                Discovery =
+                {
+                    AdditionalEndpointBaseAddresses = { new Uri(endpoint).GetLeftPart(UriPartial.Authority) },
+                    ValidateEndpoints = !config.DoNotValidateEndpoints,
+                    RequireHttps = !config.DisableHttps,
+                    ValidateIssuerName = !config.DoNotValidateIssuerName,
+                },
+            },
+        };
+
+        var oidcClient = new OidcClient(options);
+        return oidcClient;
+    }
+
+    private static void ProcessRoles(
+        string[] segments,
+        Claim claim,
+        OidConfig config,
+        TimedAuthorizeState timedState)
+    {
+        List<string> roles;
+        // If we are not using JSON values, just use the raw info from the claim value
+        if (segments.Length == 1)
+        {
+            roles = [claim.Value];
+        }
+        else
+        {
+            // We recursively traverse through the JSON data for the roles and parse it
+            var json = JsonConvert.DeserializeObject<IDictionary<string, object>>(claim.Value);
+            if (json is null)
+            {
+                roles = [];
+            }
+            else
+            {
+                bool missingSegment = false;
+                for (int i = 1; i < segments.Length - 1; i++)
+                {
+                    string segment = segments[i];
+                    if (!json.TryGetValue(segment, out object nextToken)
+                        || nextToken is not JObject nextObject)
+                    {
+                        missingSegment = true;
+                        break;
+                    }
+
+                    json = nextObject.ToObject<IDictionary<string, object>>();
+                    if (json is null)
+                    {
+                        missingSegment = true;
+                        break;
+                    }
+                }
+
+                if (missingSegment || !json.TryGetValue(segments[^1], out object rolesToken)
+                                   || rolesToken is not JArray rolesArray)
+                {
+                    roles = [];
+                }
+                else
+                {
+                    // The final step is to take the JSON and turn it from a dictionary into a string
+                    roles = rolesArray.ToObject<List<string>>();
+                }
+            }
+        }
+
+        foreach (string role in roles)
+        {
+            // Check if allowed to login based on roles
+            if (config.Roles != null && config.Roles.Length != 0)
+            {
+                foreach (string validRoles in config.Roles)
+                {
+                    if (role.Equals(validRoles))
+                    {
+                        timedState.Valid = true;
+                    }
+                }
+            }
+
+            // Check if admin based on roles
+            if (config.AdminRoles != null && config.AdminRoles.Length != 0)
+            {
+                foreach (string validAdminRoles in config.AdminRoles)
+                {
+                    if (role.Equals(validAdminRoles))
+                    {
+                        timedState.Admin = true;
+                    }
+                }
+            }
+
+            // Get allowed folders from roles
+            if (config.EnableFolderRoles)
+            {
+                foreach (FolderRoleMap folderRoleMap in config.FolderRoleMapping)
+                {
+                    if (role.Equals(folderRoleMap.Role?.Trim()))
+                    {
+                        timedState.Folders.AddRange(folderRoleMap.Folders);
+                    }
+                }
+            }
+
+            if (config.EnableLiveTvRoles)
+            {
+                // Check if allowed Live TV based on roles
+                if (config.LiveTvRoles != null && config.LiveTvRoles.Any())
+                {
+                    foreach (string validLiveTvRoles in config.LiveTvRoles)
+                    {
+                        if (role.Equals(validLiveTvRoles))
+                        {
+                            timedState.EnableLiveTv = true;
+                        }
+                    }
+                }
+
+                // Check if allowed Live TV management based on roles
+                if (config.LiveTvManagementRoles != null && config.LiveTvManagementRoles.Any())
+                {
+                    foreach (string validLiveTvManagementRoles in config.LiveTvManagementRoles)
+                    {
+                        if (role.Equals(validLiveTvManagementRoles))
+                        {
+                            timedState.EnableLiveTvManagement = true;
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// <summary>
@@ -374,66 +424,39 @@ public class OpenIDConnectController : ControllerBase
     {
         Invalidate();
         OidConfig config;
+
         try
         {
             config = OpenIDConnect.Instance.Configuration.OidConfigs[provider];
+
+            if (!config.Enabled)
+            {
+                throw new KeyNotFoundException();
+            }
         }
         catch (KeyNotFoundException)
         {
             throw new ArgumentException("Provider does not exist");
         }
 
-        if (config.Enabled)
+        OidcClient oidcClient = CreateOidcClient(provider, config, out ActionResult configError);
+        if (configError != null)
         {
-            string redirectUri = GetRequestBase(config.SchemeOverride, config.PortOverride)
-                                 + $"/OpenIDConnect/redirect/{provider}";
-
-            var options = new OidcClientOptions
-            {
-                Authority = config.OidEndpoint?.Trim(),
-                ClientId = config.OidClientId?.Trim(),
-                ClientSecret = config.OidSecret?.Trim(),
-                RedirectUri = redirectUri,
-                Scope = string.Join(" ", config.OidScopes.Prepend("openid profile")),
-                DisablePushedAuthorization = config.DisablePushedAuthorization,
-                LoggerFactory = _loggerFactory,
-                LoadProfile = !config.DoNotLoadProfile,
-                HttpClientFactory = o =>
-                {
-                    HttpClient client = _httpClientFactory.CreateClient();
-                    var assembly = Assembly.GetExecutingAssembly();
-                    FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
-                    string version = fvi.FileVersion;
-
-                    client.DefaultRequestHeaders.UserAgent.ParseAdd(
-                        $"Jellyfin-Plugin-OpenID-Connect +{version} (https://github.com/DaniCatGames/jellyfin-openid-connect)");
-                    return client;
-                },
-            };
-            var oidEndpointUri = new Uri(config.OidEndpoint?.Trim());
-            options.Policy.Discovery.AdditionalEndpointBaseAddresses.Add(
-                oidEndpointUri.GetLeftPart(UriPartial.Authority));
-            options.Policy.Discovery.ValidateEndpoints =
-                !config.DoNotValidateEndpoints; // For Google and other providers with different endpoints
-            options.Policy.Discovery.RequireHttps = !config.DisableHttps;
-            options.Policy.Discovery.ValidateIssuerName = !config.DoNotValidateIssuerName;
-            var oidcClient = new OidcClient(options);
-            AuthorizeState state = await oidcClient.PrepareLoginAsync().ConfigureAwait(false);
-
-            if (state.IsError)
-            {
-                return ReturnError(StatusCodes.Status400BadRequest,
-                    $"Error preparing login: {state.Error} - {state.ErrorDescription}");
-            }
-
-            StateManager.Add(state.State, new TimedAuthorizeState(state, DateTime.Now));
-
-            // Track whether this is a linking request or not.
-            StateManager[state.State].IsLinking = isLinking;
-            return Redirect(state.StartUrl);
+            return configError;
         }
 
-        throw new ArgumentException("Provider does not exist");
+        AuthorizeState state = await oidcClient.PrepareLoginAsync().ConfigureAwait(false);
+
+        if (state.IsError)
+        {
+            return BadRequest($"Error preparing login: {state.Error} - {state.ErrorDescription}");
+        }
+
+        StateManager.Add(state.State, new TimedAuthorizeState(state, DateTime.Now));
+
+        // Track whether this is a linking request or not.
+        StateManager[state.State].IsLinking = isLinking;
+        return Redirect(state.StartUrl);
     }
 
     /// <summary>
@@ -444,7 +467,7 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="config">The OID configuration (deserialized from a JSON post).</param>
     [Authorize(Policy = Policies.RequiresElevation)]
     [HttpPost("Add/{provider}")]
-    public void OidAdd(string provider, [FromBody] OidConfig config)
+    public static void OidAdd(string provider, [FromBody] OidConfig config)
     {
         PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
         configuration.OidConfigs[provider] = config;
@@ -457,7 +480,7 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="provider">Name of provider to delete.</param>
     [Authorize(Policy = Policies.RequiresElevation)]
     [HttpGet("Del/{provider}")]
-    public void OidDel(string provider)
+    public static void OidDel(string provider)
     {
         PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
         configuration.OidConfigs.Remove(provider);
@@ -517,29 +540,31 @@ public class OpenIDConnectController : ControllerBase
             return BadRequest("No matching provider found");
         }
 
-        if (config.Enabled)
+        if (!config.Enabled)
         {
-            foreach (KeyValuePair<string, TimedAuthorizeState> kvp in StateManager)
-            {
-                if (kvp.Value.State.State.Equals(response.Data) && kvp.Value.Valid)
-                {
-                    Guid userId = await CreateCanonicalLinkAndUserIfNotExist(provider, kvp.Value.Username);
+            return Problem("Something went wrong");
+        }
 
-                    AuthenticationResult authenticationResult = await Authenticate(
-                            userId,
-                            kvp.Value.Admin,
-                            config.EnableAuthorization,
-                            config.EnableAllFolders,
-                            kvp.Value.Folders.ToArray(),
-                            kvp.Value.EnableLiveTv,
-                            kvp.Value.EnableLiveTvManagement,
-                            response,
-                            config.DefaultProvider?.Trim(),
-                            kvp.Value.AvatarURL)
-                        .ConfigureAwait(false);
-                    StateManager.Remove(kvp.Key);
-                    return Ok(authenticationResult);
-                }
+        foreach (KeyValuePair<string, TimedAuthorizeState> kvp in StateManager)
+        {
+            if (kvp.Value.State.State.Equals(response.Data) && kvp.Value.Valid)
+            {
+                Guid userId = await CreateCanonicalLinkAndUserIfNotExist(provider, kvp.Value.Username);
+
+                AuthenticationResult authenticationResult = await Authenticate(
+                        userId,
+                        kvp.Value.Admin,
+                        config.EnableAuthorization,
+                        config.EnableAllFolders,
+                        kvp.Value.Folders.ToArray(),
+                        kvp.Value.EnableLiveTv,
+                        kvp.Value.EnableLiveTvManagement,
+                        response,
+                        config.DefaultProvider?.Trim(),
+                        kvp.Value.AvatarURL)
+                    .ConfigureAwait(false);
+                StateManager.Remove(kvp.Key);
+                return Ok(authenticationResult);
             }
         }
 
@@ -562,25 +587,18 @@ public class OpenIDConnectController : ControllerBase
         return Ok();
     }
 
-    private SerializableDictionary<string, Guid> GetCanonicalLinks(string provider)
+    private static SerializableDictionary<string, Guid> GetCanonicalLinks(string provider)
     {
         SerializableDictionary<string, Guid> links = OpenIDConnect.Instance.Configuration.OidConfigs[provider]
-            .CanonicalLinks;
-
-        if (links == null)
-        {
-            links = new SerializableDictionary<string, Guid>();
-        }
+            .CanonicalLinks ?? new SerializableDictionary<string, Guid>();
 
         return links;
     }
 
     private async Task<Guid> CreateCanonicalLinkAndUserIfNotExist(string provider, string canonicalName)
     {
-        User user = null;
-
         // First try to get the user by its id in case it was already registered before
-        var userId = Guid.Empty;
+        Guid userId;
         try
         {
             userId = GetCanonicalLink(provider, canonicalName);
@@ -591,14 +609,7 @@ public class OpenIDConnectController : ControllerBase
         }
 
         // No userId found? Let's try and find the user by name instead
-        if (userId == Guid.Empty)
-        {
-            user = _userManager.GetUserByName(canonicalName);
-        }
-        else
-        {
-            user = _userManager.GetUserById(userId);
-        }
+        User user = userId == Guid.Empty ? _userManager.GetUserByName(canonicalName) : _userManager.GetUserById(userId);
 
         if (user == null)
         {
@@ -610,7 +621,7 @@ public class OpenIDConnectController : ControllerBase
             // like the text says it does.
             UserPolicy policy = _userManager.GetUserDto(user).Policy;
             policy.EnableAllFolders = false;
-            policy.EnabledFolders = Array.Empty<Guid>();
+            policy.EnabledFolders = [];
             await _userManager.UpdatePolicyAsync(user.Id, policy).ConfigureAwait(false);
 
             user.AuthenticationProviderId = GetType().FullName;
@@ -624,16 +635,6 @@ public class OpenIDConnectController : ControllerBase
             UpdateCanonicalLinkConfig(links, provider);
         }
 
-        userId = Guid.Empty;
-        try
-        {
-            userId = GetCanonicalLink(provider, canonicalName);
-        }
-        catch (KeyNotFoundException)
-        {
-            userId = Guid.Empty;
-        }
-
         if (userId == Guid.Empty)
         {
             _logger.LogInformation("SSO user link doesn't exist, creating...");
@@ -644,15 +645,10 @@ public class OpenIDConnectController : ControllerBase
         return userId;
     }
 
-    private Guid GetCanonicalLink(string provider, string canonicalName)
+    private static Guid GetCanonicalLink(string provider, string canonicalName)
     {
-        SerializableDictionary<string, Guid> links = null;
-        var userId = Guid.Empty;
-
-        links = GetCanonicalLinks(provider);
-
-        userId = links[canonicalName];
-
+        SerializableDictionary<string, Guid> links = GetCanonicalLinks(provider);
+        Guid userId = links[canonicalName];
         return userId;
     }
 
@@ -764,10 +760,9 @@ public class OpenIDConnectController : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     private ActionResult OidLink(string provider, Guid jellyfinUserId, AuthResponse response)
     {
-        OidConfig config;
         try
         {
-            config = OpenIDConnect.Instance.Configuration.OidConfigs[provider];
+            OidConfig config = OpenIDConnect.Instance.Configuration.OidConfigs[provider];
         }
         catch (KeyNotFoundException)
         {
@@ -788,7 +783,7 @@ public class OpenIDConnectController : ControllerBase
 
     private ActionResult CreateCanonicalLink(string provider, [FromRoute] Guid jellyfinUserId, string providerUserId)
     {
-        SerializableDictionary<string, Guid> links = null;
+        SerializableDictionary<string, Guid> links;
         try
         {
             links = GetCanonicalLinks(provider);
@@ -839,6 +834,8 @@ public class OpenIDConnectController : ControllerBase
     {
         User user = _userManager.GetUserById(userId);
 
+        // TODO: should have been fixed in https://github.com/jellyfin/jellyfin/pull/16944
+
         // Persist permissions via UpdatePolicyAsync rather than SetPermission + UpdateUserAsync:
         // on Jellyfin 10.11 the latter does not save the Permissions table (jellyfin/jellyfin#16298).
         // UpdatePolicyAsync loads the user tracked and uses dbContext.Update(user), persisting the
@@ -874,6 +871,8 @@ public class OpenIDConnectController : ControllerBase
         // now stale (its row-version no longer matches). Re-fetch before any further UpdateUserAsync,
         // otherwise the next save throws DbUpdateConcurrencyException ("0 rows affected").
         user = _userManager.GetUserById(userId);
+
+        // TODO: use claim (default to 'picture'?) instead of custom picture urls
 
         if (avatarUrl is not null)
         {
@@ -947,7 +946,7 @@ public class OpenIDConnectController : ControllerBase
         return await _sessionManager.AuthenticateDirect(authRequest).ConfigureAwait(false);
     }
 
-    private void Invalidate()
+    private static void Invalidate()
     {
         foreach (KeyValuePair<string, TimedAuthorizeState> kvp in StateManager)
         {
@@ -992,12 +991,14 @@ public class OpenIDConnectController : ControllerBase
         }.ToString().TrimEnd('/');
     }
 
-    private ContentResult ReturnError(int code, string message)
+    private static ContentResult ReturnError(int code, string message)
     {
-        var errorResult = new ContentResult();
-        errorResult.Content = message;
-        errorResult.ContentType = MediaTypeNames.Text.Plain;
-        errorResult.StatusCode = code;
+        var errorResult = new ContentResult
+        {
+            Content = message,
+            ContentType = MediaTypeNames.Text.Plain,
+            StatusCode = code,
+        };
         return errorResult;
     }
 }

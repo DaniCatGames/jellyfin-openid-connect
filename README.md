@@ -27,6 +27,14 @@ This is 100% alpha software! PRs are welcome to improve the code.
 
 **This is for Jellyfin >=12.0 and only on the Web UI or clients supporting [Quick Connect](https://jellyfin.org/docs/general/server/quick-connect)**
 
+## TODO:
+- [ ] Linking is not working
+- [ ] RP Initiated Logout for browser sessions
+- [ ] Use 'picture' claim for avatar syncing
+- [ ] Fix some links on the config page
+- [ ] expose js function to automatically create login page links
+- [ ] Use refresh token to 
+
 ## Tested Providers
 
 [Find provider specific documentation in docs/providers.md](docs/providers.md)

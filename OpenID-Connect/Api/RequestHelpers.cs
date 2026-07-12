@@ -40,13 +40,13 @@ public static class RequestHelpers
 
         User authenticatedUser = auth.User;
 
-        // If they're going to update the record of another user, they must be an administrator
-        if (!userId.Equals(auth.UserId) && !authenticatedUser.HasPermission(PermissionKind.IsAdministrator)
-            || restrictUserPreferences && !authenticatedUser.EnableUserPreferenceAccess)
+        if (authenticatedUser == null)
         {
             return false;
         }
 
-        return true;
+        // If they're going to update the record of another user, they must be an administrator
+        return (userId.Equals(auth.UserId) || authenticatedUser.HasPermission(PermissionKind.IsAdministrator))
+               && (!restrictUserPreferences || authenticatedUser.EnableUserPreferenceAccess);
     }
 }

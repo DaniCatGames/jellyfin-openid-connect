@@ -15,4 +15,4 @@ artifacts:
   - "Duende.IdentityModel.OidcClient.dll"
   - "Duende.IdentityModel.dll"
 changelog: |-
-  - Update to Jellyfin 12.0
+  - Unstable release
