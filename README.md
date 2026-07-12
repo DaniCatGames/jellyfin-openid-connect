@@ -1,4 +1,4 @@
-<h1 align="center">Jellyfin OIDC Plugin</h1>
+<h1 align="center">Jellyfin OpenIDConnect</h1>
 
 <p align="center">
 
@@ -6,20 +6,20 @@
 <br/>
 <br/>
 <a href="https://github.com/DaniCatGames/jellyfin-openid-connect">
-<img alt="GPL 3.0 License" src="https://img.shields.io/github/license/DaniCatGames/jellyfin-openid-connect.svg"/>
+    <img alt="GPL 3.0 License" src="https://img.shields.io/github/license/DaniCatGames/jellyfin-openid-connect.svg"/>
 </a>
 <a href="https://github.com/DaniCatGames/jellyfin-openid-connect/actions/workflows/publish-unstable.yml">
-<img alt="Unstable Build Status" src="https://github.com/DaniCatGames/jellyfin-openid-connect/actions/workflows/publish-unstable.yml/badge.svg"/>
+    <img alt="Unstable Build Status" src="https://github.com/DaniCatGames/jellyfin-openid-connect/actions/workflows/publish-unstable.yml/badge.svg"/>
 </a>
 <a href="https://github.com/DaniCatGames/jellyfin-openid-connect/releases">
-<img alt="Current Release" src="https://img.shields.io/github/release/DaniCatGames/jellyfin-openid-connect.svg"/>
+    <img alt="Current Release" src="https://img.shields.io/github/release/DaniCatGames/jellyfin-openid-connect.svg"/>
 </a>
 
-This plugin allows users to sign in through an SSO provider (such as Google, Microsoft, or your own provider). This enables one-click signin.
+This plugin allows users to sign in through an OpenIDConnect provider (such as Google, Microsoft, or your own provider). This enables one-click signin.
 
 https://user-images.githubusercontent.com/17993169/149681516-f93b43f5-fa5c-4c1f-a909-e5414878a864.mp4
 
-Existing users may link new SSO accounts, or remove existing links using self-service at `/OpenIDConnect/linking`.
+Existing users may link new SSO accounts, or remove existing links using self-service at `/OpenIDConnectViews/link`.
 
 ## Current State
 
@@ -39,7 +39,7 @@ This is 100% alpha software! PRs are welcome to improve the code.
 - Kanidm
 - Google OpenID: Works, but usernames are all numeric
 
-While the above providers are apprently working, I personally only use Authentik (+dex for testing)
+While the above providers are apprently working, I personally only use and test with Authentik
 
 ## Installing
 
@@ -51,7 +51,7 @@ Add the stable package repository to your Jellyfin plugin repositories (**Dashbo
 https://raw.githubusercontent.com/DaniCatGames/jellyfin-openid-connect/manifest-stable/manifest.json
 ```
 
-Then install **openid-connect** from the plugin catalog.
+Then install **OpenID Connect** from the plugin catalog.
 
 ### Unstable builds
 
@@ -67,13 +67,13 @@ Unstable builds may have new features unavailable in stable, but **be warned**: 
 
 ### Branch builds
 
-Builds for individual feature branches are uploaded as artifacts on each branch's GitHub Actions run (named `oidc-<branch>-<sha>.zip`) and must be installed manually. They are not published to any repository.
+Builds for individual feature branches are uploaded as artifacts on each branch's GitHub Actions run (named `openid-connect-<branch>-<sha>.zip`) and must be installed manually. They are not published to any repository.
 
 See [Building & Releasing](docs/building.md) for instructions on how to build from source.
 
 ## Limitations
 
-Logging in with an SSO account that has the same username as an existing Jellyfin account will override the permissions for the user. Use caution when overriding the administrator account!
+Logging in with an OIDC account that has the same username as an existing Jellyfin account will override the permissions for the user. Use caution when overriding the administrator account!
 
 ~~There is no GUI to sign in. You have to make it yourself! The buttons should redirect to something like this: [https://myjellyfin.example.com/sso/OID/start/clientid](https://myjellyfin.example.com/sso/OID/start/clientid) replacing `clientid` with the provider client ID.~~
 
