@@ -8,6 +8,9 @@
 <a href="https://github.com/DaniCatGames/jellyfin-openid-connect">
     <img alt="GPL 3.0 License" src="https://img.shields.io/github/license/DaniCatGames/jellyfin-openid-connect.svg"/>
 </a>
+<a href="https://github.com/DaniCatGames/jellyfin-openid-connect/actions/workflows/publish.yml">
+    <img alt="Stable Build Status" src="https://github.com/DaniCatGames/jellyfin-openid-connect/actions/workflows/publish.yml/badge.svg"/>
+</a>
 <a href="https://github.com/DaniCatGames/jellyfin-openid-connect/actions/workflows/publish-unstable.yml">
     <img alt="Unstable Build Status" src="https://github.com/DaniCatGames/jellyfin-openid-connect/actions/workflows/publish-unstable.yml/badge.svg"/>
 </a>
@@ -33,7 +36,7 @@ This is 100% alpha software! PRs are welcome to improve the code.
 - [ ] Use 'picture' claim for avatar syncing
 - [ ] Fix some links on the config page
 - [ ] expose js function to automatically create login page links
-- [ ] Use refresh token to 
+- [ ] Use refresh token to (optionally?) allow for stuff like disabling account from IdP
 
 ## Tested Providers
 
