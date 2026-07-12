@@ -93,7 +93,6 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="state">The current request state.</param>
     /// <returns>A webpage that will complete the client-side flow.</returns>
     // Actually a GET: https://github.com/IdentityModel/IdentityModel.OidcClient/issues/325
-    [HttpGet("r/{provider}")]
     [HttpGet("redirect/{provider}")]
     public async Task<ActionResult> OidCallback(
         [FromRoute] string provider,
@@ -128,8 +127,7 @@ public class OpenIDConnectController : ControllerBase
                 ClientId = config.OidClientId?.Trim(),
                 ClientSecret = config.OidSecret?.Trim(),
                 RedirectUri = GetRequestBase(config.SchemeOverride, config.PortOverride)
-                              + $"/OpenIDConnect/{(Request.Path.Value.Contains("/start/", StringComparison.InvariantCultureIgnoreCase) ? "redirect" : "r")}/"
-                              + provider,
+                              + $"/OpenIDConnect/redirect/{provider}",
                 Scope = string.Join(" ", scopes.Prepend("openid profile")),
                 DisablePushedAuthorization = config.DisablePushedAuthorization,
                 LoggerFactory = _loggerFactory,
@@ -371,7 +369,6 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="provider">The name of the provider.</param>
     /// <param name="isLinking">Whether or not this request is to link accounts (Rather than authenticate).</param>
     /// <returns>An asynchronous result for the authentication.</returns>
-    [HttpGet("p/{provider}")]
     [HttpGet("start/{provider}")]
     public async Task<ActionResult> OidChallenge(string provider, [FromQuery] bool isLinking = false)
     {
@@ -388,15 +385,8 @@ public class OpenIDConnectController : ControllerBase
 
         if (config.Enabled)
         {
-            bool newPath = config.NewPath;
-            if (!isLinking)
-            {
-                newPath = Request.Path.Value.Contains("/start/", StringComparison.InvariantCultureIgnoreCase);
-                config.NewPath = newPath;
-            }
-
             string redirectUri = GetRequestBase(config.SchemeOverride, config.PortOverride)
-                                 + $"/OpenIDConnect/{(newPath ? "redirect" : "r")}/" + provider;
+                                 + $"/OpenIDConnect/redirect/{provider}";
 
             var options = new OidcClientOptions
             {
