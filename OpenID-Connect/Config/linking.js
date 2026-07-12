@@ -7,15 +7,11 @@ const ssoConfigLinking = {
         const provider_list_oid = view.querySelector(`#${provider_list_oid_id}`);
         provider_list_oid.innerHTML = "";
 
-        ApiClient.getJSON(ApiClient.getUrl("OpenIDConnect/OID/GetNames")).then((config_names) => {
-            ssoConfigLinking.loadProviderList(
-                provider_list_oid,
-                config_names,
-                "oid",
-            );
+        ApiClient.getJSON(ApiClient.getUrl("OpenIDConnect/GetNames")).then((config_names) => {
+            ssoConfigLinking.loadProviderList(provider_list_oid, config_names);
         });
     },
-    loadProviderList: (container, providers, provider_mode) => {
+    loadProviderList: (container, providers) => {
         providers.forEach((provider_name) => {
             var provider_config = document.createElement("div");
             provider_config.classList.add("sso-provider-links-container");
@@ -36,18 +32,14 @@ const ssoConfigLinking = {
         data-provider="${provider_name}"
       ></div>
       `;
-            var add_provider = provider_config.querySelector(
-                ".sso-provider-add-link",
-            );
+            var add_provider = provider_config.querySelector(".sso-provider-add-link");
 
             //const provider_name_css = ssoConfigLinking.safeCSSId(provider_name);
             //provider_link.id = "sso-provider-" + provider_name_css;
             //provider_link.classList.add("sso-provider-" + provider_name_css);
             add_provider.classList.add("sso-provider");
 
-            add_provider.href = ApiClient.getUrl(
-                `/OpenIDConnect/${provider_mode}/p/${provider_name}?isLinking=true`,
-            );
+            add_provider.href = ApiClient.getUrl(`/OpenIDConnect/p/${provider_name}?isLinking=true`);
 
             container.appendChild(provider_config);
         });
@@ -55,11 +47,9 @@ const ssoConfigLinking = {
         const currentUserId = ApiClient.getCurrentUserId();
 
         if (currentUserId) {
-            ApiClient.getJSON(
-                ApiClient.getUrl(`OpenIDConnect/${provider_mode}/links/${currentUserId}`)
-            ).then((resp) => {
+            ApiClient.getJSON(ApiClient.getUrl(`OpenIDConnect/links/${currentUserId}`)).then((resp) => {
                 resp.json().then((provider_map) => {
-                    console.log({provider_map, currentUserId});
+                    console.log({ provider_map, currentUserId });
 
                     Object.keys(provider_map).forEach((provider_name) => {
                         const provider_container = container.querySelector(
@@ -67,7 +57,6 @@ const ssoConfigLinking = {
                         );
                         ssoConfigLinking.populateExistingLinks(
                             provider_container,
-                            provider_mode,
                             provider_name,
                             provider_map[provider_name],
                         );
@@ -77,15 +66,8 @@ const ssoConfigLinking = {
         }
     },
 
-    populateExistingLinks: (
-        container,
-        provider_mode,
-        provider_name,
-        canonical_names,
-    ) => {
-        container
-            .querySelectorAll(".sso-provider-link-checkbox-wrapper")
-            .forEach((e) => e.remove());
+    populateExistingLinks: (container, provider_mode, canonical_names) => {
+        container.querySelectorAll(".sso-provider-link-checkbox-wrapper").forEach((e) => e.remove());
 
         const checkboxes = canonical_names.map((canonical_name) => {
             var out = document.createElement("label");
@@ -97,7 +79,6 @@ const ssoConfigLinking = {
           class="sso-link-checkbox"
           data-id="${canonical_name}"
           data-mode="${provider_mode}"
-          data-provider="${provider_name}"
           type="checkbox"
         />
         <span class="checkbox-label">${canonical_name}</span>
@@ -119,10 +100,9 @@ const ssoConfigLinking = {
         const delete_requests = [...view.querySelectorAll(".sso-link-checkbox")]
             .filter((checkbox_link) => {
                 const canonical_name = checkbox_link.getAttribute("data-id");
-                const provider_name = checkbox_link.getAttribute("data-provider");
                 const provider_mode = checkbox_link.getAttribute("data-mode");
 
-                if (![canonical_name, provider_name, provider_mode].every((e) => e)) {
+                if (![canonical_name, provider_mode].every((e) => e)) {
                     return false;
                 }
 
@@ -135,18 +115,15 @@ const ssoConfigLinking = {
             .map((checked_link) => {
                 const canonical_name = checked_link.getAttribute("data-id");
                 const provider_name = checked_link.getAttribute("data-provider");
-                const provider_mode = checked_link.getAttribute("data-mode");
 
                 return ApiClient.fetch({
                     type: "DELETE",
-                    url: ApiClient.getUrl(
-                        `OpenIDConnect/${provider_mode}/link/${provider_name}/${currentUserId}/${canonical_name}`,
-                    ),
+                    url: ApiClient.getUrl(`OpenIDConnect/link/${provider_name}/${currentUserId}/${canonical_name}`),
                 });
             });
 
         Promise.all(delete_requests).then((values) => {
-            console.log({message: "Delete requests handled", values});
+            console.log({ message: "Delete requests handled", values });
             window.location.reload();
         });
     },
@@ -156,13 +133,10 @@ export default function (view) {
     ssoConfigLinking.loadProviders(view);
 
     view.querySelector("#enable-delete").addEventListener("change", (e) => {
-        view.querySelector("#btn-delete-selected-links").disabled =
-            !e.target.checked;
+        view.querySelector("#btn-delete-selected-links").disabled = !e.target.checked;
     });
 
-    view
-        .querySelector("#btn-delete-selected-links")
-        .addEventListener("click", (e) =>
-            ssoConfigLinking.handleDeleteButtonPressed(e, view),
-        );
+    view.querySelector("#btn-delete-selected-links").addEventListener("click", (e) =>
+        ssoConfigLinking.handleDeleteButtonPressed(e, view),
+    );
 }

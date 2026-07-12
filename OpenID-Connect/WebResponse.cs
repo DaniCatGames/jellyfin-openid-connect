@@ -435,7 +435,7 @@ async function link(request) {
     if (jfUser == null) return;
     if (jfToken == null) return;
 
-    const url = '" + $"{punycodeBaseUrl}/OpenIDConnect/OID/Link/{provider}/" + @"' + jfUser;
+    const url = '" + $"{punycodeBaseUrl}/OpenIDConnect/Link/{provider}/" + @"' + jfUser;
 
     return new Promise(resolve => {
        var xhr = new XMLHttpRequest();
@@ -478,7 +478,7 @@ async function main() {
 
     if (" + $"{isLinking}".ToLower() + @") await link(request);
 
-    var url = '" + punycodeBaseUrl + "/OpenIDConnect/OID/Auth/" + provider + @"';
+    var url = '" + punycodeBaseUrl + "/OpenIDConnect/Auth/" + provider + @"';
 
     let response = await new Promise(resolve => {
        var xhr = new XMLHttpRequest();

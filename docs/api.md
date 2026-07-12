@@ -1,14 +1,14 @@
 # API Endpoints
 
-The API is all done from a base URL of `/sso/`
+The API is all done from a base URL of `/OpenIDConnect/`
 
 ## OpenID
 
 ### Flow
 
-- GET `OID/redirect/PROVIDER_NAME`: This is the OpenID callback path. This will return HTML and JavaScript for the client to login with a given provider name.
-- GET `OID/start/PROVIDER_NAME`: This is the OpenID initiator: it will begin the authorization flow for OpenID with a given provider name.
-- POST `OID/Auth/PROVIDER_NAME`: This is the OpenID client-side API: the HTML and JavaScript client will call this endpoint to receive Jellyfin credentials for a given provider name. Post format is in JSON with the following keys:
+- GET `redirect/PROVIDER_NAME`: This is the OpenID callback path. This will return HTML and JavaScript for the client to login with a given provider name.
+- GET `start/PROVIDER_NAME`: This is the OpenID initiator: it will begin the authorization flow for OpenID with a given provider name.
+- POST `Auth/PROVIDER_NAME`: This is the OpenID client-side API: the HTML and JavaScript client will call this endpoint to receive Jellyfin credentials for a given provider name. Post format is in JSON with the following keys:
   - `deviceId`: string. Device ID.
   - `deviceName`: string. Device name.
   - `appName`: string. App name.
@@ -19,7 +19,7 @@ The API is all done from a base URL of `/sso/`
 
 These all require authorization. Append an API key to the end of the request: `curl "http://myjellyfin.example.com/sso/OID/Get?api_key=9c6e5fae4ae145669e6b7a3942f813b7"`
 
-- POST `OID/Add/PROVIDER_NAME`: This adds or overwrites a configuration for OpenID with a given provider name. It accepts JSON with the following keys and format:
+- POST `Add/PROVIDER_NAME`: This adds or overwrites a configuration for OpenID with a given provider name. It accepts JSON with the following keys and format:
   - `oidEndpoint`: string. The OpenID endpoint. Must have a `.well-known` path available.
   - `oidClientId`: string. The OpenID client ID.
   - `oidSecret`: string. The OpenID secret.
@@ -47,9 +47,9 @@ These all require authorization. Append an API key to the end of the request: `c
   - `doNotValidateEndpoints`: boolean. Determines whether the OpenID discovery process will validate endpoints. This may be required for Google.
   - `doNotValidateIssuerName`: boolean. Determines whether the OpenID discovery process will validate the OpenID issuer name.
   - `schemeOverride`: string. Sets the scheme for URLs used. Can be useful if the plugin refuses to use HTTPS URLs.
-- GET `OID/Del/PROVIDER_NAME`: This removes a configuration for OpenID for a given provider name.
-- GET `OID/Get`: Lists the configurations currently available.
-- GET `OID/States`: Lists currently active OpenID flows in progress.
+- GET `Del/PROVIDER_NAME`: This removes a configuration for OpenID for a given provider name.
+- GET `Get`: Lists the configurations currently available.
+- GET `States`: Lists currently active OpenID flows in progress.
 
 ## Misc
 

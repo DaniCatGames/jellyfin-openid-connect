@@ -93,8 +93,8 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="state">The current request state.</param>
     /// <returns>A webpage that will complete the client-side flow.</returns>
     // Actually a GET: https://github.com/IdentityModel/IdentityModel.OidcClient/issues/325
-    [HttpGet("OID/r/{provider}")]
-    [HttpGet("OID/redirect/{provider}")]
+    [HttpGet("r/{provider}")]
+    [HttpGet("redirect/{provider}")]
     public async Task<ActionResult> OidCallback(
         [FromRoute] string provider,
         [FromQuery] string state)
@@ -128,7 +128,7 @@ public class OpenIDConnectController : ControllerBase
                 ClientId = config.OidClientId?.Trim(),
                 ClientSecret = config.OidSecret?.Trim(),
                 RedirectUri = GetRequestBase(config.SchemeOverride, config.PortOverride)
-                              + $"/OpenIDConnect/OID/{(Request.Path.Value.Contains("/start/", StringComparison.InvariantCultureIgnoreCase) ? "redirect" : "r")}/"
+                              + $"/OpenIDConnect/{(Request.Path.Value.Contains("/start/", StringComparison.InvariantCultureIgnoreCase) ? "redirect" : "r")}/"
                               + provider,
                 Scope = string.Join(" ", scopes.Prepend("openid profile")),
                 DisablePushedAuthorization = config.DisablePushedAuthorization,
@@ -371,8 +371,8 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="provider">The name of the provider.</param>
     /// <param name="isLinking">Whether or not this request is to link accounts (Rather than authenticate).</param>
     /// <returns>An asynchronous result for the authentication.</returns>
-    [HttpGet("OID/p/{provider}")]
-    [HttpGet("OID/start/{provider}")]
+    [HttpGet("p/{provider}")]
+    [HttpGet("start/{provider}")]
     public async Task<ActionResult> OidChallenge(string provider, [FromQuery] bool isLinking = false)
     {
         Invalidate();
@@ -396,7 +396,7 @@ public class OpenIDConnectController : ControllerBase
             }
 
             string redirectUri = GetRequestBase(config.SchemeOverride, config.PortOverride)
-                                 + $"/OpenIDConnect/OID/{(newPath ? "redirect" : "r")}/" + provider;
+                                 + $"/OpenIDConnect/{(newPath ? "redirect" : "r")}/" + provider;
 
             var options = new OidcClientOptions
             {
@@ -453,7 +453,7 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="provider">The name of the provider to add.</param>
     /// <param name="config">The OID configuration (deserialized from a JSON post).</param>
     [Authorize(Policy = Policies.RequiresElevation)]
-    [HttpPost("OID/Add/{provider}")]
+    [HttpPost("Add/{provider}")]
     public void OidAdd(string provider, [FromBody] OidConfig config)
     {
         PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
@@ -466,7 +466,7 @@ public class OpenIDConnectController : ControllerBase
     /// </summary>
     /// <param name="provider">Name of provider to delete.</param>
     [Authorize(Policy = Policies.RequiresElevation)]
-    [HttpGet("OID/Del/{provider}")]
+    [HttpGet("Del/{provider}")]
     public void OidDel(string provider)
     {
         PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
@@ -479,7 +479,7 @@ public class OpenIDConnectController : ControllerBase
     /// </summary>
     /// <returns>The list of OpenID configurations.</returns>
     [Authorize(Policy = Policies.RequiresElevation)]
-    [HttpGet("OID/Get")]
+    [HttpGet("Get")]
     public ActionResult OidProviders()
     {
         return Ok(OpenIDConnect.Instance.Configuration.OidConfigs);
@@ -489,7 +489,7 @@ public class OpenIDConnectController : ControllerBase
     ///     Lists the OpenID providers names only.
     /// </summary>
     /// <returns>The list of OpenID configurations.</returns>
-    [HttpGet("OID/GetNames")]
+    [HttpGet("GetNames")]
     public ActionResult OidProviderNames()
     {
         return Ok(OpenIDConnect.Instance.Configuration.OidConfigs.Keys);
@@ -500,7 +500,7 @@ public class OpenIDConnectController : ControllerBase
     /// </summary>
     /// <returns>The list of OpenID flows in progress.</returns>
     [Authorize(Policy = Policies.RequiresElevation)]
-    [HttpGet("OID/States")]
+    [HttpGet("States")]
     public ActionResult OidStates()
     {
         return Ok(StateManager);
@@ -512,7 +512,7 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="provider">Name of provider to authenticate against.</param>
     /// <param name="response">The data passed to the client to ensure it is the right one.</param>
     /// <returns>JSON for the client to populate information with.</returns>
-    [HttpPost("OID/Auth/{provider}")]
+    [HttpPost("Auth/{provider}")]
     [Consumes(MediaTypeNames.Application.Json)]
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult> OidAuth(string provider, [FromBody] AuthResponse response)
@@ -674,7 +674,7 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="authResponse">The client information to authenticate the user with.</param>
     /// <returns>Whether this API endpoint succeeded.</returns>
     [Authorize]
-    [HttpPost("OID/Link/{provider}/{jellyfinUserId}")]
+    [HttpPost("Link/{provider}/{jellyfinUserId}")]
     [Consumes(MediaTypeNames.Application.Json)]
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult> AddCanonicalLink(
@@ -699,7 +699,7 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="canonicalName">The user ID within jellyfin to unlink.</param>
     /// <returns>Whether this API endpoint succeeded.</returns>
     [Authorize]
-    [HttpDelete("OID/Link/{provider}/{jellyfinUserId}/{canonicalName}")]
+    [HttpDelete("Link/{provider}/{jellyfinUserId}/{canonicalName}")]
     [Consumes(MediaTypeNames.Application.Json)]
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult> DeleteCanonicalLink(
@@ -735,7 +735,7 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="jellyfinUserId">The user ID within jellyfin for which to return the links.</param>
     /// <returns>A dictionary of provider : link mappings.</returns>
     [Authorize]
-    [HttpGet("oid/links/{jellyfinUserId}")]
+    [HttpGet("Links/{jellyfinUserId}")]
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult<SerializableDictionary<string, IEnumerable<string>>>> GetOidLinksByUser(
         Guid jellyfinUserId)
