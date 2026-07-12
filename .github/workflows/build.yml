@@ -11,7 +11,7 @@ on:
 
 jobs:
   call:
-    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/build.yaml@c66b7d88b5febaa6dd685c13b60e5e2c1d3d01db # master
+    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/build.yaml@91aa56610cd3321f8897bbe2657c1743b3df3436 # master
     with: 
       dotnet-target: 'net10.0'
       dotnet-version: '10.0.x'
