@@ -8,7 +8,6 @@ using System.Net.Http;
 using System.Net.Mime;
 using System.Reflection;
 using System.Security.Claims;
-using System.Security.Cryptography;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Duende.IdentityModel.OidcClient;
@@ -631,10 +630,8 @@ public class OpenIDConnectController : ControllerBase
             policy.EnabledFolders = [];
             await _userManager.UpdatePolicyAsync(user.Id, policy).ConfigureAwait(false);
 
-            user.AuthenticationProviderId = GetType().FullName;
-            // https://jonathancrozier.com/blog/how-to-generate-a-cryptographically-secure-random-string-in-dot-net-with-c-sharp
-            user.Password = _cryptoProvider
-                .CreatePasswordHash(Convert.ToBase64String(RandomNumberGenerator.GetBytes(64))).ToString();
+            user.AuthenticationProviderId = "Jellyfin.Plugin.OpenIDConnect.AuthProvider";
+            await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
 
             // Make sure there aren't any trailing existing links
             SerializableDictionary<string, Guid> links = GetCanonicalLinks(provider);
