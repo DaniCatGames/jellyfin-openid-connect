@@ -146,15 +146,7 @@ public class OidConfig
     [XmlElement("CanonicalLinks")]
     public SerializableDictionary<string, Guid> CanonicalLinks
     {
-        get
-        {
-            if (_canonicalLinks == null)
-            {
-                return new SerializableDictionary<string, Guid>();
-            }
-
-            return _canonicalLinks;
-        }
+        get => _canonicalLinks ?? new SerializableDictionary<string, Guid>();
         set => _canonicalLinks = value;
     }
 
