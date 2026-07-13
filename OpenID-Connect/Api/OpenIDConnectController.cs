@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -38,8 +39,8 @@ namespace Jellyfin.Plugin.OpenIDConnect.Api;
 [Route("[controller]")]
 public class OpenIDConnectController : ControllerBase
 {
-    private static readonly IDictionary<string, TimedAuthorizeState> StateManager =
-        new Dictionary<string, TimedAuthorizeState>();
+    private static readonly ConcurrentDictionary<string, TimedAuthorizeState> StateManager =
+        new ConcurrentDictionary<string, TimedAuthorizeState>();
 
     private readonly IAuthorizationContext _authContext;
     private readonly ICryptoProvider _cryptoProvider;
@@ -452,7 +453,7 @@ public class OpenIDConnectController : ControllerBase
             return BadRequest($"Error preparing login: {state.Error} - {state.ErrorDescription}");
         }
 
-        StateManager.Add(state.State, new TimedAuthorizeState(state, DateTime.Now));
+        StateManager.TryAdd(state.State, new TimedAuthorizeState(state, DateTime.Now));
 
         // Track whether this is a linking request or not.
         StateManager[state.State].IsLinking = isLinking;
@@ -545,27 +546,27 @@ public class OpenIDConnectController : ControllerBase
             return Problem("Something went wrong");
         }
 
-        foreach (KeyValuePair<string, TimedAuthorizeState> kvp in StateManager)
-        {
-            if (kvp.Value.State.State.Equals(response.Data) && kvp.Value.Valid)
-            {
-                Guid userId = await CreateCanonicalLinkAndUserIfNotExist(provider, kvp.Value.Username);
 
-                AuthenticationResult authenticationResult = await Authenticate(
-                        userId,
-                        kvp.Value.Admin,
-                        config.EnableAuthorization,
-                        config.EnableAllFolders,
-                        kvp.Value.Folders.ToArray(),
-                        kvp.Value.EnableLiveTv,
-                        kvp.Value.EnableLiveTvManagement,
-                        response,
-                        config.DefaultProvider?.Trim(),
-                        kvp.Value.AvatarURL)
-                    .ConfigureAwait(false);
-                StateManager.Remove(kvp.Key);
-                return Ok(authenticationResult);
-            }
+        foreach (KeyValuePair<string, TimedAuthorizeState> kvp in StateManager.Where(kvp =>
+                     kvp.Value.State.State.Equals(response.Data) && kvp.Value.Valid))
+        {
+            Guid userId = await CreateCanonicalLinkAndUserIfNotExist(provider, kvp.Value.Username);
+
+            AuthenticationResult authenticationResult = await Authenticate(
+                    userId,
+                    kvp.Value.Admin,
+                    config.EnableAuthorization,
+                    config.EnableAllFolders,
+                    kvp.Value.Folders.ToArray(),
+                    kvp.Value.EnableLiveTv,
+                    kvp.Value.EnableLiveTvManagement,
+                    response,
+                    config.DefaultProvider?.Trim(),
+                    kvp.Value.AvatarURL)
+                .ConfigureAwait(false);
+
+            StateManager.TryRemove(kvp);
+            return Ok(authenticationResult);
         }
 
         return Problem("Something went wrong");
@@ -769,13 +770,13 @@ public class OpenIDConnectController : ControllerBase
             return BadRequest("No matching provider found");
         }
 
-        foreach (KeyValuePair<string, TimedAuthorizeState> kvp in StateManager)
+        foreach (KeyValuePair<string, TimedAuthorizeState> kvp in StateManager.Where(kvp =>
+                     kvp.Value.State.State.Equals(response.Data) && kvp.Value.Valid))
         {
-            if (kvp.Value.State.State.Equals(response.Data) && kvp.Value.Valid)
-            {
-                string providerUserId = kvp.Value.Username;
-                return CreateCanonicalLink(provider, jellyfinUserId, providerUserId);
-            }
+            string providerUserId = kvp.Value.Username;
+            StateManager.TryRemove(kvp);
+
+            return CreateCanonicalLink(provider, jellyfinUserId, providerUserId);
         }
 
         return Problem("Something went wrong!");
@@ -884,7 +885,7 @@ public class OpenIDConnectController : ControllerBase
                 FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
                 string version = fvi.FileVersion;
                 client.DefaultRequestHeaders.UserAgent.ParseAdd(
-                    $"Jellyfin-Plugin-OpenID-Connect +{version} (https://github.com/DaniCatGames/jellyfin-openid-connect)");
+                    $"Jellyfin-OpenID-Connect +{version} (https://github.com/DaniCatGames/jellyfin-openid-connect)");
 
                 HttpResponseMessage avatarResponse = await client.GetAsync(avatarUrl);
 
@@ -928,13 +929,15 @@ public class OpenIDConnectController : ControllerBase
 
         await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
 
-        var authRequest = new AuthenticationRequest();
-        authRequest.UserId = user.Id;
-        authRequest.Username = user.Username;
-        authRequest.App = authResponse.AppName;
-        authRequest.AppVersion = authResponse.AppVersion;
-        authRequest.DeviceId = authResponse.DeviceID;
-        authRequest.DeviceName = authResponse.DeviceName;
+        var authRequest = new AuthenticationRequest
+        {
+            UserId = user.Id,
+            Username = user.Username,
+            App = authResponse.AppName,
+            AppVersion = authResponse.AppVersion,
+            DeviceId = authResponse.DeviceID,
+            DeviceName = authResponse.DeviceName,
+        };
         _logger.LogInformation("Auth request created...");
         if (!string.IsNullOrEmpty(defaultProvider))
         {
@@ -948,13 +951,11 @@ public class OpenIDConnectController : ControllerBase
 
     private static void Invalidate()
     {
-        foreach (KeyValuePair<string, TimedAuthorizeState> kvp in StateManager)
+        DateTime cutoff = DateTime.UtcNow.AddMinutes(-1);
+
+        foreach (KeyValuePair<string, TimedAuthorizeState> kvp in StateManager.Where(kvp => kvp.Value.Created < cutoff))
         {
-            DateTime now = DateTime.Now;
-            if (now.Subtract(kvp.Value.Created).TotalMinutes > 1)
-            {
-                StateManager.Remove(kvp.Key);
-            }
+            StateManager.TryRemove(kvp);
         }
     }
 
