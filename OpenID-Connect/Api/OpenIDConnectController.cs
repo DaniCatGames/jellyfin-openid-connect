@@ -621,6 +621,8 @@ public class OpenIDConnectController : ControllerBase
             _logger.LogInformation($"SSO user {canonicalName} doesn't exist, creating...");
             user = await _userManager.CreateUserAsync(canonicalName).ConfigureAwait(false);
 
+            userId = user.Id;
+
             // PATCH: Strip default Jellyfin permissions exactly once on creation
             // Either permissions will be overwritten by provider, or this will let them default to none
             // like the text says it does.
