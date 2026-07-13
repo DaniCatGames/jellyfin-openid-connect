@@ -38,6 +38,7 @@ This is 100% alpha software! PRs are welcome to improve the code.
 - [ ] Expose js function to automatically create login page links
 - [ ] Use refresh token to (optionally?) allow for stuff like disabling account from IdP
 - [ ] Settings for account takeover/creation from IdP
+- [ ] Update configuration UI
 
 ## Tested Providers
 
