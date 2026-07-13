@@ -547,27 +547,30 @@ public class OpenIDConnectController : ControllerBase
             return Problem("Something went wrong");
         }
 
-
-        foreach (KeyValuePair<string, TimedAuthorizeState> kvp in StateManager.Where(kvp =>
-                     kvp.Value.State.State.Equals(response.Data) && kvp.Value.Valid))
+        if (StateManager.TryGetValue(response.Data, out TimedAuthorizeState timedState))
         {
-            Guid userId = await CreateCanonicalLinkAndUserIfNotExist(provider, kvp.Value.Username);
+            StateManager.TryRemove(response.Data, out _);
 
-            AuthenticationResult authenticationResult = await Authenticate(
-                    userId,
-                    kvp.Value.Admin,
-                    config.EnableAuthorization,
-                    config.EnableAllFolders,
-                    kvp.Value.Folders.ToArray(),
-                    kvp.Value.EnableLiveTv,
-                    kvp.Value.EnableLiveTvManagement,
-                    response,
-                    config.DefaultProvider?.Trim(),
-                    kvp.Value.AvatarURL)
-                .ConfigureAwait(false);
+            // check if state is still valid
+            if (timedState.Valid && timedState.Created >= DateTime.UtcNow.AddMinutes(-1))
+            {
+                Guid userId = await CreateCanonicalLinkAndUserIfNotExist(provider, timedState.Username);
 
-            StateManager.TryRemove(kvp);
-            return Ok(authenticationResult);
+                AuthenticationResult authenticationResult = await Authenticate(
+                        userId,
+                        timedState.Admin,
+                        config.EnableAuthorization,
+                        config.EnableAllFolders,
+                        timedState.Folders.ToArray(),
+                        timedState.EnableLiveTv,
+                        timedState.EnableLiveTvManagement,
+                        response,
+                        config.DefaultProvider?.Trim(),
+                        timedState.AvatarURL)
+                    .ConfigureAwait(false);
+
+                return Ok(authenticationResult);
+            }
         }
 
         return Problem("Something went wrong");
@@ -771,13 +774,14 @@ public class OpenIDConnectController : ControllerBase
             return BadRequest("No matching provider found");
         }
 
-        foreach (KeyValuePair<string, TimedAuthorizeState> kvp in StateManager.Where(kvp =>
-                     kvp.Value.State.State.Equals(response.Data) && kvp.Value.Valid))
+        if (StateManager.TryGetValue(response.Data, out TimedAuthorizeState timedState))
         {
-            string providerUserId = kvp.Value.Username;
-            StateManager.TryRemove(kvp);
-
-            return CreateCanonicalLink(provider, jellyfinUserId, providerUserId);
+            // check if state is still valid
+            if (timedState.Valid && timedState.Created >= DateTime.UtcNow.AddMinutes(-1))
+            {
+                StateManager.TryRemove(response.Data, out _);
+                return CreateCanonicalLink(provider, jellyfinUserId, timedState.Username);
+            }
         }
 
         return Problem("Something went wrong!");
