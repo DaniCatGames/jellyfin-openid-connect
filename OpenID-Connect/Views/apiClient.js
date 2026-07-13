@@ -18,7 +18,7 @@ export async function serverAddress({ basePath = "/web" }) {
         let url;
         const index = window.location.href.toLowerCase().lastIndexOf(basePath.toLowerCase());
 
-        if (index != -1) {
+        if (index !== -1) {
             url = window.location.href.substring(0, index);
         } else {
             // Return nothing, let another method handle it
@@ -98,29 +98,29 @@ await awaitLocalStorage();
 
 // Fetch credentials
 
-var credentials = new jellyfinApiclient.Credentials();
+const credentials = new jellyfinApiclient.Credentials();
 
-var server = await serverAddress({ basePath: "/OpenIDConnectViews" });
+const server = await serverAddress({ basePath: "/OpenIDConnectViews" });
 
 const infoResponse = await fetch(`${server}/System/Info/Public`);
 const serverInfo = await infoResponse.json();
 const activeServerId = serverInfo.Id;
 
 console.log({ server: server });
-var deviceId = getDeviceId();
-var appName = "Jellyfin%20Web";
-var appVersion = serverInfo.Version;
-var capabilities = {};
+const deviceId = getDeviceId();
+const appName = "Jellyfin%20Web";
+const appVersion = serverInfo.Version;
+const capabilities = {};
 
 const current_server = credentials.credentials().Servers.find((e) => e.Id === activeServerId) || {};
 
-var localApiClient = new jellyfinApiclient.ApiClient(server, appName, appVersion, getDeviceName(), deviceId);
+const localApiClient = new jellyfinApiclient.ApiClient(server, appName, appVersion, getDeviceName(), deviceId);
 
 localApiClient.enableAutomaticBitrateDetection = false;
 
 localApiClient.setAuthenticationInfo(current_server.AccessToken, current_server.UserId);
 
-var connections = new jellyfinApiclient.ConnectionManager(
+const connections = new jellyfinApiclient.ConnectionManager(
     credentials,
     appName,
     appVersion,
