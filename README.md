@@ -30,13 +30,14 @@ This is 100% alpha software! PRs are welcome to improve the code.
 
 **This is for Jellyfin >=12.0 and only on the Web UI or clients supporting [Quick Connect](https://jellyfin.org/docs/general/server/quick-connect)**
 
-## TODO:
-- [ ] Linking is not working
+## Roadmap
+- [ ] Fix account linking
 - [ ] RP Initiated Logout for browser sessions
 - [ ] Use 'picture' claim for avatar syncing
 - [ ] Fix some links on the config page
-- [ ] expose js function to automatically create login page links
+- [ ] Expose js function to automatically create login page links
 - [ ] Use refresh token to (optionally?) allow for stuff like disabling account from IdP
+- [ ] Settings for account takeover/creation from IdP
 
 ## Tested Providers
 
