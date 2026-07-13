@@ -14,6 +14,7 @@ using System.Threading.Tasks;
 using Duende.IdentityModel.OidcClient;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Plugin.OpenIDConnect.Config;
+using Jellyfin.Plugin.OpenIDConnect.Views;
 using MediaBrowser.Common.Api;
 using MediaBrowser.Controller.Authentication;
 using MediaBrowser.Controller.Configuration;

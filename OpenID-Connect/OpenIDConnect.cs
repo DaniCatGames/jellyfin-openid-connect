@@ -96,6 +96,11 @@ public class OpenIDConnect : BasePlugin<PluginConfiguration>, IPlugin, IHasWebPa
                 Name = "jellyfin-apiClient.esm.min.js",
                 EmbeddedResourcePath = $"{GetType().Namespace}.Views.jellyfin-apiClient.esm.min.js",
             },
+            new PluginPageInfo
+            {
+                Name = "shared.js",
+                EmbeddedResourcePath = $"{GetType().Namespace}.Views.shared.js",
+            },
         ];
     }
 }

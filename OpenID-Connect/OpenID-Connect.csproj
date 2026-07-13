@@ -16,6 +16,8 @@
         <None Remove="Views\apiClient.js"/>
         <None Remove="Views\jellyfin-apiClient.esm.min.js"/>
         <None Remove="Views\emby-restyle.css"/>
+        <None Remove="Views\shared.js"/>
+        <None Remove="Views\flow.html"/>
         <EmbeddedResource Include="Config\configPage.html"/>
         <EmbeddedResource Include="Config\config.js"/>
         <EmbeddedResource Include="Config\style.css"/>
@@ -24,6 +26,8 @@
         <EmbeddedResource Include="Views\apiClient.js"/>
         <EmbeddedResource Include="Views\jellyfin-apiClient.esm.min.js"/>
         <EmbeddedResource Include="Views\emby-restyle.css"/>
+        <EmbeddedResource Include="Views\shared.js"/>
+        <EmbeddedResource Include="Views\flow.html"/>
     </ItemGroup>
 
     <ItemGroup>

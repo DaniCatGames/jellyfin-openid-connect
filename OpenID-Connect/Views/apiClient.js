@@ -1,4 +1,5 @@
 import jellyfinApiclient from "./jellyfin-apiClient.esm.min.js";
+import { getDeviceName, sleep } from "./shared.js";
 
 window.jellyfinApiclient = jellyfinApiclient;
 console.log(jellyfinApiclient);
@@ -78,23 +79,9 @@ export async function serverAddress({ basePath = "/web" }) {
         });
 }
 
-// TODO: Refactor duplicated code
-// ! Duplicated at WebResponse.cs#L363-L401
-function getDeviceName() {
-    const ua = navigator.userAgent;
-    if (ua.includes("Firefox")) return "Firefox";
-    if (ua.includes("Chrome")) return "Chrome";
-    if (ua.includes("Safari")) return "Safari";
-    return "Web Browser";
-}
-
 function getDeviceId() {
     return localStorage.getItem("_deviceId2");
 }
-
-const sleep = (milliseconds) => {
-    return new Promise((resolve) => setTimeout(resolve, milliseconds));
-};
 
 async function awaitLocalStorage() {
     while (

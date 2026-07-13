@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta content='width=device-width, initial-scale=1' name='viewport'>
+    <style>
+        body {
+            background: #101010;
+            color: #d1cfce;
+            font-family: Noto Sans, Noto Sans HK, Noto Sans JP, Noto Sans KR, Noto Sans SC, Noto Sans TC, sans-serif;
+        }
+    </style>
+    <title>Logging in...</title>
+</head>
+<body>
+<p>Logging in...</p>
+<noscript>Please enable Javascript to complete the login</noscript>
+<script type="module">
+    import {getDeviceName, sleep} from '<<<BASEURL>>>/OpenIDConnectViews/shared.js'
+
+    async function link(request) {
+        const jfCredentialsString = localStorage.getItem("jellyfin_credentials")
+
+        if (jfCredentialsString == null) return;
+
+        const jfCredentials = JSON.parse(jfCredentialsString);
+        const jfUser = jfCredentials['Servers'][0]['UserId'];
+        const jfToken = jfCredentials['Servers'][0]['AccessToken'];
+
+        if (jfUser == null) return;
+        if (jfToken == null) return;
+
+        const url = '<<<BASEURL>>>/OpenIDConnect/Link/<<<PROVIDER>>>/' + jfUser;
+
+        return new Promise(resolve => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('Accept', 'application/json');
+
+            xhr.setRequestHeader(
+                'X-Emby-Authorization',
+                `MediaBrowser Client=""${request.appName}"",Device=""${request.deviceName}"",DeviceId=""${request.deviceId}"",Version=""${request.appVersion}"",Token=""${jfToken}""`)
+
+            xhr.onload = function (e) {
+                resolve(xhr.response);
+            };
+            xhr.onerror = function (e) {
+                console.log(e);
+                resolve(undefined);
+            };
+            xhr.send(JSON.stringify(request));
+        })
+    }
+
+    async function main() {
+        localStorage.removeItem('jellyfin_credentials');
+        document.getElementById('iframe-main').src = '<<<BASEURL>>>/web/index.html';
+
+        const data = "<<<DATA>>>";
+
+        // If localStorage isn't initialized yet, wait until it is.
+        while (localStorage.getItem("_deviceId2") == null || localStorage.getItem("jellyfin_credentials") == null
+        || JSON.parse(localStorage.getItem("jellyfin_credentials"))['Servers'][0]['Id'] == null) {
+            await sleep(100);
+        }
+
+        const deviceId = localStorage.getItem("_deviceId2");
+        const appName = "Jellyfin Web";
+        const appVersion = "10.8.0";
+        const deviceName = getDeviceName();
+
+        const request = {deviceId, appName, appVersion, deviceName, data};
+
+        if ("<<<ISLINKING>>>") await link(request);
+
+        const url = '<<<BASEURL>>>/OpenIDConnect/Auth/<<<PROVIDER>>>';
+
+        let response = await new Promise(resolve => {
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', url, true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            xhr.setRequestHeader('Accept', 'application/json');
+            xhr.onload = function (e) {
+                resolve(xhr.response);
+            };
+            xhr.onerror = function () {
+                resolve(undefined);
+            };
+            xhr.send(JSON.stringify(request));
+        })
+        const responseJson = JSON.parse(response);
+
+        const userId = 'user-' + responseJson['User']['Id'] + '-' + responseJson['User']['ServerId'];
+        responseJson['User']['EnableAutoLogin'] = true;
+        localStorage.setItem(userId, JSON.stringify(responseJson['User']));
+
+        const jfCreds = JSON.parse(localStorage.getItem('jellyfin_credentials'));
+        jfCreds['Servers'][0]['AccessToken'] = responseJson['AccessToken'];
+        jfCreds['Servers'][0]['UserId'] = responseJson['User']['Id'];
+        localStorage.setItem('jellyfin_credentials', JSON.stringify(jfCreds));
+        localStorage.setItem('enableAutoLogin', 'true');
+        window.location.replace('<<<BASEURL>>>/web/index.html');
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        main();
+    });
+
+    // https://stackoverflow.com/a/25435165
+</script>
+<iframe class='docs-texteventtarget-iframe' id='iframe-main' sandbox='allow-same-origin allow-forms allow-scripts'
+        src='' style='position: absolute;width:0;height:0;border:0;'></iframe>
+</body>
+</html>
