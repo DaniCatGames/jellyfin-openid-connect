@@ -1,4 +1,4 @@
-<h1 align="center">Jellyfin OpenIDConnect</h1>
+<h1 align="center">Jellyfin OpenID Connect</h1>
 
 <p align="center">
 
@@ -22,7 +22,7 @@ This plugin allows users to sign in through an OpenID Connect provider (such as 
 
 https://user-images.githubusercontent.com/17993169/149681516-f93b43f5-fa5c-4c1f-a909-e5414878a864.mp4
 
-Existing users may link new SSO accounts, or remove existing links using self-service at `/OpenIDConnectViews/link`.
+Existing users may link new OIDC accounts, or remove existing links using self-service at `https://jellyfin.example.com/OpenIDConnectViews/link`.
 
 ## Current State
 
@@ -31,7 +31,7 @@ This is 100% alpha software! PRs are welcome to improve the code.
 **This is for Jellyfin >=12.0 and only on the Web UI or clients supporting [Quick Connect](https://jellyfin.org/docs/general/server/quick-connect)**
 
 ## Roadmap
-- [ ] Fix account linking
+- [x] Fix account linking
 - [ ] RP Initiated Logout for browser sessions
 - [ ] Use 'picture' claim for avatar syncing
 - [ ] Fix some links on the config page
@@ -39,6 +39,7 @@ This is 100% alpha software! PRs are welcome to improve the code.
 - [ ] Use refresh token to (optionally?) allow for stuff like disabling account from IdP
 - [ ] Settings for account takeover/creation from IdP
 - [ ] Update configuration UI
+- [ ] Update documentation to reflect changes
 
 ## Tested Providers
 
@@ -61,7 +62,7 @@ While the above providers are apprently working, I personally only use and test 
 Add the stable package repository to your Jellyfin plugin repositories (**Dashboard → Plugins → Repositories → +**):
 
 ```
-https://raw.githubusercontent.com/DaniCatGames/jellyfin-openid-connect/manifest-stable/manifest.json
+https://raw.githubusercontent.com/DaniCatGames/jellyfin-openid-connect/manifest/manifest.json
 ```
 
 Then install **OpenID Connect** from the plugin catalog.
@@ -88,7 +89,7 @@ See [Building & Releasing](docs/building.md) for instructions on how to build fr
 
 Logging in with an OIDC account that has the same username as an existing Jellyfin account will override the permissions for the user. Use caution when overriding the administrator account!
 
-~~There is no GUI to sign in. You have to make it yourself! The buttons should redirect to something like this: [https://myjellyfin.example.com/sso/OID/start/clientid](https://myjellyfin.example.com/sso/OID/start/clientid) replacing `clientid` with the provider client ID.~~
+There is no GUI to sign in. You have to make it yourself! The buttons should redirect to something like this: [https://jellyfin.example.com/OpenIDConnect/start/<provider name>](https://myjellyfin.example.com/sso/OID/start/clientid) replacing `<provider name>` with the name of the provider in your config.
 
 There is also no logout callback. Logging out of Jellyfin will log you out of Jellyfin only, instead of the SSO provider as well.
 
