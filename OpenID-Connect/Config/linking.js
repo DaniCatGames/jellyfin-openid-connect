@@ -47,20 +47,18 @@ const ssoConfigLinking = {
         const currentUserId = ApiClient.getCurrentUserId();
 
         if (currentUserId) {
-            ApiClient.getJSON(ApiClient.getUrl(`OpenIDConnect/links/${currentUserId}`)).then((resp) => {
-                resp.json().then((provider_map) => {
-                    console.log({ provider_map, currentUserId });
+            ApiClient.getJSON(ApiClient.getUrl(`OpenIDConnect/links/${currentUserId}`)).then((provider_map) => {
+                console.log({ provider_map, currentUserId });
 
-                    Object.keys(provider_map).forEach((provider_name) => {
-                        const provider_container = container.querySelector(
-                            `.sso-provider-existing-links-container[data-provider="${provider_name}"]`,
-                        );
-                        ssoConfigLinking.populateExistingLinks(
-                            provider_container,
-                            provider_name,
-                            provider_map[provider_name],
-                        );
-                    });
+                Object.keys(provider_map).forEach((provider_name) => {
+                    const provider_container = container.querySelector(
+                        `.sso-provider-existing-links-container[data-provider="${provider_name}"]`,
+                    );
+                    ssoConfigLinking.populateExistingLinks(
+                        provider_container,
+                        provider_name,
+                        provider_map[provider_name],
+                    );
                 });
             });
         }
