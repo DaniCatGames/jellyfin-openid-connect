@@ -54,9 +54,9 @@ public static class WebResponse
         string punycodeBaseUrl = protocol + punycodeDomain;
 
         return GetTemplate()
-            .Replace("<<<BASEURL>>>", punycodeBaseUrl)
-            .Replace("<<<PROVIDER>>>", provider)
-            .Replace("<<<DATA>>>", data)
-            .Replace("<<<ISLINKING>>>", isLinking.ToString().ToLower());
+            .Replace("CS_BASEURL", punycodeBaseUrl)
+            .Replace("CS_PROVIDER", provider)
+            .Replace("CS_DATA", data)
+            .Replace("CS_ISLINKING", isLinking.ToString().ToLower());
     }
 }

@@ -453,10 +453,13 @@ public class OpenIDConnectController : ControllerBase
             return BadRequest($"Error preparing login: {state.Error} - {state.ErrorDescription}");
         }
 
-        StateManager.TryAdd(state.State, new TimedAuthorizeState(state, DateTime.Now));
+        var timedState = new TimedAuthorizeState(state, DateTime.UtcNow)
+        {
+            IsLinking = isLinking,
+        };
 
-        // Track whether this is a linking request or not.
-        StateManager[state.State].IsLinking = isLinking;
+        StateManager.TryAdd(state.State, timedState);
+
         return Redirect(state.StartUrl);
     }
 

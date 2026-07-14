@@ -15,48 +15,44 @@
 <p>Logging in...</p>
 <noscript>Please enable Javascript to complete the login</noscript>
 <script type="module">
-    import {getDeviceName, sleep} from '<<<BASEURL>>>/OpenIDConnectViews/shared.js'
+    import {getDeviceName, sleep} from 'CS_BASEURL/OpenIDConnectViews/shared.js'
 
     async function link(request) {
         const jfCredentialsString = localStorage.getItem("jellyfin_credentials")
 
-        if (jfCredentialsString == null) return;
+        if (jfCredentialsString == null) return false;
 
         const jfCredentials = JSON.parse(jfCredentialsString);
         const jfUser = jfCredentials['Servers'][0]['UserId'];
         const jfToken = jfCredentials['Servers'][0]['AccessToken'];
 
-        if (jfUser == null) return;
-        if (jfToken == null) return;
+        if (jfUser == null) return false;
+        if (jfToken == null) return false;
 
-        const url = '<<<BASEURL>>>/OpenIDConnect/Link/<<<PROVIDER>>>/' + jfUser;
+        const url = 'CS_BASEURL/OpenIDConnect/Link/CS_PROVIDER/' + jfUser;
 
-        return new Promise(resolve => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', url, true);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.setRequestHeader('Accept', 'application/json');
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `MediaBrowser Client="${request.appName}", Device="${request.deviceName}", DeviceId="${request.deviceId}", Version="${request.appVersion}", Token="${jfToken}"`
+            },
+            body: JSON.stringify(request)
+        });
 
-            xhr.setRequestHeader(
-                'X-Emby-Authorization',
-                `MediaBrowser Client=""${request.appName}"",Device=""${request.deviceName}"",DeviceId=""${request.deviceId}"",Version=""${request.appVersion}"",Token=""${jfToken}""`)
+        if (!response.ok) {
+            console.error('HTTP error:', response.status);
+            return false
+        }
 
-            xhr.onload = function (e) {
-                resolve(xhr.response);
-            };
-            xhr.onerror = function (e) {
-                console.log(e);
-                resolve(undefined);
-            };
-            xhr.send(JSON.stringify(request));
-        })
+        return true
     }
 
     async function main() {
-        localStorage.removeItem('jellyfin_credentials');
-        document.getElementById('iframe-main').src = '<<<BASEURL>>>/web/index.html';
+        document.getElementById('iframe-main').src = 'CS_BASEURL/web/index.html';
 
-        const data = "<<<DATA>>>";
+        const data = "CS_DATA";
 
         // If localStorage isn't initialized yet, wait until it is.
         while (localStorage.getItem("_deviceId2") == null || localStorage.getItem("jellyfin_credentials") == null
@@ -71,35 +67,52 @@
 
         const request = {deviceId, appName, appVersion, deviceName, data};
 
-        if ("<<<ISLINKING>>>") await link(request);
+        if (CS_ISLINKING) {
+            const status = await link(request);
 
-        const url = '<<<BASEURL>>>/OpenIDConnect/Auth/<<<PROVIDER>>>';
+            if (status) {
+                window.location.replace('CS_BASEURL/web/index.html');
+            } else {
+                document.body.innerHTML = "<p>Account linking failed.</h3>";
+            }
+        } else {
+            localStorage.removeItem('jellyfin_credentials');
 
-        let response = await new Promise(resolve => {
-            const xhr = new XMLHttpRequest();
-            xhr.open('POST', url, true);
-            xhr.setRequestHeader('Content-Type', 'application/json');
-            xhr.setRequestHeader('Accept', 'application/json');
-            xhr.onload = function (e) {
-                resolve(xhr.response);
-            };
-            xhr.onerror = function () {
-                resolve(undefined);
-            };
-            xhr.send(JSON.stringify(request));
-        })
-        const responseJson = JSON.parse(response);
+            // If localStorage isn't initialized yet, wait until it is.
+            while (localStorage.getItem("_deviceId2") == null || localStorage.getItem("jellyfin_credentials") == null
+            || JSON.parse(localStorage.getItem("jellyfin_credentials"))['Servers'][0]['Id'] == null) {
+                await sleep(100);
+            }
 
-        const userId = 'user-' + responseJson['User']['Id'] + '-' + responseJson['User']['ServerId'];
-        responseJson['User']['EnableAutoLogin'] = true;
-        localStorage.setItem(userId, JSON.stringify(responseJson['User']));
+            const url = 'CS_BASEURL/OpenIDConnect/Auth/CS_PROVIDER';
 
-        const jfCreds = JSON.parse(localStorage.getItem('jellyfin_credentials'));
-        jfCreds['Servers'][0]['AccessToken'] = responseJson['AccessToken'];
-        jfCreds['Servers'][0]['UserId'] = responseJson['User']['Id'];
-        localStorage.setItem('jellyfin_credentials', JSON.stringify(jfCreds));
-        localStorage.setItem('enableAutoLogin', 'true');
-        window.location.replace('<<<BASEURL>>>/web/index.html');
+            let response = await new Promise(resolve => {
+                const xhr = new XMLHttpRequest();
+                xhr.open('POST', url, true);
+                xhr.setRequestHeader('Content-Type', 'application/json');
+                xhr.setRequestHeader('Accept', 'application/json');
+                xhr.onload = function (e) {
+                    resolve(xhr.response);
+                };
+                xhr.onerror = function () {
+                    resolve(undefined);
+                };
+                xhr.send(JSON.stringify(request));
+            })
+            const responseJson = JSON.parse(response);
+
+            const userId = 'user-' + responseJson['User']['Id'] + '-' + responseJson['User']['ServerId'];
+            responseJson['User']['EnableAutoLogin'] = true;
+            localStorage.setItem(userId, JSON.stringify(responseJson['User']));
+
+            const jfCreds = JSON.parse(localStorage.getItem('jellyfin_credentials'));
+            jfCreds['Servers'][0]['AccessToken'] = responseJson['AccessToken'];
+            jfCreds['Servers'][0]['UserId'] = responseJson['User']['Id'];
+            localStorage.setItem('jellyfin_credentials', JSON.stringify(jfCreds));
+            localStorage.setItem('enableAutoLogin', 'true');
+
+            window.location.replace('CS_BASEURL/web/index.html');
+        }
     }
 
     document.addEventListener('DOMContentLoaded', function () {
