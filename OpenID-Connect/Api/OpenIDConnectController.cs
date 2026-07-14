@@ -585,11 +585,14 @@ public class OpenIDConnectController : ControllerBase
     /// <returns>Whether this API endpoint succeeded.</returns>
     [Authorize(Policy = Policies.RequiresElevation)]
     [HttpPost("Unregister/{username}")]
-    public ActionResult Unregister(string username, [FromBody] string provider)
+    public async Task<ActionResult> Unregister(string username, [FromBody] string provider)
     {
+        // TODO: better safety checks
         User user = _userManager.GetUserByName(username);
         user.AuthenticationProviderId = provider;
+        await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
 
+        // TODO: remove zombie canconical links?
         return Ok();
     }
 
