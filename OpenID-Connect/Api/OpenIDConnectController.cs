@@ -564,7 +564,6 @@ public class OpenIDConnectController : ControllerBase
                         timedState.EnableLiveTv,
                         timedState.EnableLiveTvManagement,
                         response,
-                        config.DefaultProvider?.Trim(),
                         timedState.AvatarURL)
                     .ConfigureAwait(false);
 
@@ -823,7 +822,6 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="enableLiveTv">Determines whether live TV access is allowed for this user.</param>
     /// <param name="enableLiveTvAdmin">Determines whether live TV can be managed by this user.</param>
     /// <param name="authResponse">The client information to authenticate the user with.</param>
-    /// <param name="defaultProvider">The default provider of the user to be set after logging in.</param>
     /// <param name="avatarUrl">The new avatar url for the user.</param>
     private async Task<AuthenticationResult> Authenticate(
         Guid userId,
@@ -834,7 +832,6 @@ public class OpenIDConnectController : ControllerBase
         bool enableLiveTv,
         bool enableLiveTvAdmin,
         AuthResponse authResponse,
-        string defaultProvider,
         string avatarUrl)
     {
         User user = _userManager.GetUserById(userId);
@@ -943,12 +940,6 @@ public class OpenIDConnectController : ControllerBase
             DeviceName = authResponse.DeviceName,
         };
         _logger.LogInformation("Auth request created...");
-        if (!string.IsNullOrEmpty(defaultProvider))
-        {
-            user.AuthenticationProviderId = defaultProvider;
-            await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
-            _logger.LogInformation("Set default login provider to " + defaultProvider);
-        }
 
         return await _sessionManager.AuthenticateDirect(authRequest).ConfigureAwait(false);
     }
