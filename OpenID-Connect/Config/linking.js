@@ -64,7 +64,7 @@ const ssoConfigLinking = {
         }
     },
 
-    populateExistingLinks: (container, provider_mode, canonical_names) => {
+    populateExistingLinks: (container, provider_name, canonical_names) => {
         container.querySelectorAll(".sso-provider-link-checkbox-wrapper").forEach((e) => e.remove());
 
         const checkboxes = canonical_names.map((canonical_name) => {
@@ -76,7 +76,7 @@ const ssoConfigLinking = {
           is="emby-checkbox"
           class="sso-link-checkbox"
           data-id="${canonical_name}"
-          data-mode="${provider_mode}"
+          data-provider="${provider_name}"
           type="checkbox"
         />
         <span class="checkbox-label">${canonical_name}</span>
@@ -98,17 +98,13 @@ const ssoConfigLinking = {
         const delete_requests = [...view.querySelectorAll(".sso-link-checkbox")]
             .filter((checkbox_link) => {
                 const canonical_name = checkbox_link.getAttribute("data-id");
-                const provider_mode = checkbox_link.getAttribute("data-mode");
+                const provider_name = checkbox_link.getAttribute("data-provider");
 
-                if (![canonical_name, provider_mode].every((e) => e)) {
+                if (![canonical_name, provider_name].every((e) => e)) {
                     return false;
                 }
 
-                if (!checkbox_link.checked) {
-                    return false;
-                }
-
-                return true;
+                return checkbox_link.checked;
             })
             .map((checked_link) => {
                 const canonical_name = checked_link.getAttribute("data-id");
@@ -116,7 +112,7 @@ const ssoConfigLinking = {
 
                 return ApiClient.fetch({
                     type: "DELETE",
-                    url: ApiClient.getUrl(`OpenIDConnect/link/${provider_name}/${currentUserId}/${canonical_name}`),
+                    url: ApiClient.getUrl(`OpenIDConnect/Link/${provider_name}/${currentUserId}/${canonical_name}`),
                 });
             });
 
