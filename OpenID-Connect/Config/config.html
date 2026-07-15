@@ -153,6 +153,49 @@
                     </div>
 
                     <div class="verticalSection">
+                        <h3 class="sectionTitle">User Info</h3>
+                        <div class="collapseContent">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="RoleClaim">Role Claim</label>
+                                <input class="oidc-text" id="RoleClaim" is="emby-input" placeholder="groups"
+                                       required=""
+                                       type="text"/>
+                                <div class="fieldDescription">
+                                    The JSON path in the OIDC response to check for roles.
+                                    Use <code>\.</code> for literal dots.
+                                    <br/>
+                                    <strong>Keycloak:</strong> <code>realm_access.roles</code> (realm) or
+                                    <code>resource_access.&gt;clientId&lt;.roles</code> (client)
+                                    <br/>
+                                    <strong>Authelia:</strong> <code>groups</code>
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="DefaultUsernameClaim">Default
+                                    Username Claim</label>
+                                <input class="oidc-text" id="DefaultUsernameClaim" is="emby-input"
+                                       placeholder="preferred_username"
+                                       type="text"/>
+                                <div class="fieldDescription">
+                                    The claim to use for the username. Defaults to <code>preferred_username</code>.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="AvatarUrlFormat">Avatar URL
+                                    Template</label>
+                                <input class="oidc-text" id="AvatarUrlFormat" is="emby-input"
+                                       placeholder="https://example.com/@{user_id}.png"
+                                       type="text"/>
+                                <div class="fieldDescription">
+                                    URL template for user avatars. Use <code>{user_id}</code> as a placeholder.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
                         <h3 class="sectionTitle">User Access &amp; Permissions</h3>
                         <div class="collapseContent">
                             <div class="checkboxContainer checkboxContainer-withDescription">
@@ -186,22 +229,6 @@
                                 <div class="fieldDescription">
                                     One role per line. Users with any of these roles receive admin privileges.
                                     Leave blank to not auto-grant admin.
-                                </div>
-                            </div>
-
-                            <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="RoleClaim">Role Claim Path</label>
-                                <input class="oidc-text" id="RoleClaim" is="emby-input" placeholder="groups"
-                                       required=""
-                                       type="text"/>
-                                <div class="fieldDescription">
-                                    The JSON path in the OIDC response to check for roles.
-                                    Use <code>\.</code> for literal dots.
-                                    <br/>
-                                    <strong>Keycloak:</strong> <code>realm_access.roles</code> (realm) or
-                                    <code>resource_access.&gt;clientId&lt;.roles</code> (client)
-                                    <br/>
-                                    <strong>Authelia:</strong> <code>groups</code>
                                 </div>
                             </div>
                         </div>
@@ -332,28 +359,6 @@
                                 <div class="fieldDescription">
                                     One scope per line. Some providers (e.g. Authelia) require additional scopes
                                     for group membership validation. Leave blank for default scopes only.
-                                </div>
-                            </div>
-
-                            <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="DefaultUsernameClaim">Default
-                                    Username Claim</label>
-                                <input class="oidc-text" id="DefaultUsernameClaim" is="emby-input"
-                                       placeholder="preferred_username"
-                                       type="text"/>
-                                <div class="fieldDescription">
-                                    The claim to use for the username. Defaults to <code>preferred_username</code>.
-                                </div>
-                            </div>
-
-                            <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="AvatarUrlFormat">Avatar URL
-                                    Template</label>
-                                <input class="oidc-text" id="AvatarUrlFormat" is="emby-input"
-                                       placeholder="https://example.com/@{user_id}.png"
-                                       type="text"/>
-                                <div class="fieldDescription">
-                                    URL template for user avatars. Use <code>{user_id}</code> as a placeholder.
                                 </div>
                             </div>
                         </div>
