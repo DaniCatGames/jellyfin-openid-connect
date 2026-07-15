@@ -216,7 +216,7 @@ public class OpenIDConnectController : ControllerBase
             _logger.LogInformation($"Is request linking: {isLinking}");
             return Content(WebResponse.Generator(state,
                     provider,
-                    GetRequestBase(config.SchemeOverride, config.PortOverride),
+                    GetRequestBase(config.UseHTTP, config.PortOverride),
                     isLinking),
                 MediaTypeNames.Text.Html);
         }
@@ -261,7 +261,7 @@ public class OpenIDConnectController : ControllerBase
             Authority = endpoint,
             ClientId = clientId,
             ClientSecret = clientSecret,
-            RedirectUri = GetRequestBase(config.SchemeOverride, config.PortOverride)
+            RedirectUri = GetRequestBase(config.UseHTTP, config.PortOverride)
                           + $"/OpenIDConnect/redirect/{provider}",
             Scope = string.Join(" ", scopes.Prepend("openid profile")),
             DisablePushedAuthorization = config.DisablePushedAuthorization,
@@ -960,7 +960,7 @@ public class OpenIDConnectController : ControllerBase
         }
     }
 
-    private string GetRequestBase(string schemeOverride = null, int? portOverride = null)
+    private string GetRequestBase(bool useHttp = false, int? portOverride = null)
     {
         int requestPort;
 
@@ -979,14 +979,9 @@ public class OpenIDConnectController : ControllerBase
             requestPort = -1;
         }
 
-        if (schemeOverride != "http" && schemeOverride != "https")
-        {
-            schemeOverride = null;
-        }
-
         return new UriBuilder
         {
-            Scheme = schemeOverride ?? Request.Scheme,
+            Scheme = useHttp ? "http" : "https",
             Host = Request.Host.Host,
             Port = requestPort,
             Path = Request.PathBase,

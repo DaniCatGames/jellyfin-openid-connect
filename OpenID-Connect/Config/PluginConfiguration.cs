@@ -126,9 +126,9 @@ public class OidConfig
     public string[] OidScopes { get; set; }
 
     /// <summary>
-    ///     Gets or sets the redirect scheme override.
+    ///     Gets or sets the whether http is used for redirect urls.
     /// </summary>
-    public string SchemeOverride { get; set; }
+    public bool UseHTTP { get; set; }
 
     /// <summary>
     ///     Gets or sets the redirect port override.

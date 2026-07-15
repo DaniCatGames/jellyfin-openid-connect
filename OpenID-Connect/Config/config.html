@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>OpenID Connect</title>
+</head>
+<body>
+<div
+    class="page type-interior pluginConfigurationPage esqConfigurationPage"
+    data-controller="__plugin/openid-connect.js"
+    data-role="page"
+    id="oidc-config-page"
+>
+    <div data-role="content">
+        <div class="content-primary">
+            <div class="sectionTitleContainer flex align-items-center">
+                <h2 class="sectionTitle">
+                    <span class="material-icons" style="vertical-align: middle; margin-right: 0.25em;">vpn_key</span>
+                    OpenID Connect
+                </h2>
+                <a
+                    class="raised button-alt emby-button headerHelpButton"
+                    href="https://github.com/DaniCatGames/jellyfin-openid-connect"
+                    is="emby-button"
+                    style="margin-left: auto;"
+                    target="_blank"
+                >
+                    <span class="material-icons" style="vertical-align: middle; font-size: 1.2em; margin-right: 0.2em;">help</span>
+                    Help
+                </a>
+            </div>
+
+            <div class="oidc-notice-bar">
+                <span class="material-icons" style="vertical-align: middle; font-size: 1.1em;">info</span>
+                Changes require a Jellyfin restart.
+                <a class="button-link" href="https://github.com/DaniCatGames/jellyfin-openid-connect"
+                   is="emby-linkbutton"
+                   target="_blank">See the help page</a>
+                for more details.
+                <br/>
+                To allow users to manage their own SSO accounts, including linking
+                SSO providers, and removing existing links, they need to visit
+                <a class="button-link"
+                   id="oidc-self-service-link"
+                   is="emby-linkbutton">
+                    the self service page
+                </a>.
+                <br/>
+                You can use
+                <a
+                    class="button-link"
+                    href="https://jellyfin.org/docs/general/clients/web-config.html#custom-menu-links"
+                    is="emby-linkbutton"
+                    target="_blank"
+                >custom menu links
+                </a>
+                to accomplish this.
+            </div>
+            <div id="oidc-dashboard-view">
+                <div class="oidc-dashboard-header">
+                    <h3 class="sectionTitle" style="margin: 0;">Configured Providers</h3>
+                </div>
+
+                <div class="oidc-provider-list" id="oidc-provider-list">
+                    <!-- Provider cards rendered by JS -->
+                </div>
+
+                <button
+                    class="raised button-submit emby-button oidc-add-btn"
+                    id="oidc-add-provider"
+                    is="emby-button"
+                    type="button"
+                >
+                    <span class="material-icons" style="vertical-align: middle; font-size: 1.2em;">add_circle</span>
+                    Add Provider
+                </button>
+            </div>
+
+            <div id="oidc-editor-view" style="display: none;">
+                <button
+                    class="raised button-alt emby-button oidc-back-btn"
+                    id="oidc-back-to-dashboard"
+                    is="emby-button"
+                    type="button"
+                >
+                    <span class="material-icons" style="vertical-align: middle; font-size: 1.2em;">arrow_back</span>
+                    Back to overview
+                </button>
+
+                <h3 class="sectionTitle" id="oidc-editor-title">
+                    <span class="oidc-mode-badge oidc-mode-new" id="oidc-editor-mode-badge">New Provider</span>
+                    <span id="oidc-editor-provider-name-display"></span>
+                </h3>
+
+                <form class="esqConfigurationForm" id="oidc-new-oidc-provider">
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Basic Settings</h3>
+                        <div class="collapseContent">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="OidProviderName">Provider
+                                    Name</label>
+                                <input class="oidc-text" id="OidProviderName" is="emby-input" required="" type="text"/>
+                                <div class="fieldDescription">
+                                    Provieder identifier (must be unique), used to identify this provider in API calls
+                                    and links.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="OidEndpoint">OpenID Endpoint</label>
+                                <input class="oidc-text" id="OidEndpoint" is="emby-input"
+                                       placeholder="https://accounts.example.com" required=""
+                                       type="text"/>
+                                <div class="fieldDescription">
+                                    The OpenID endpoint. Must have a <code>.well-known</code> path available.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="OidClientId">Client ID</label>
+                                <input class="oidc-text" id="OidClientId" is="emby-input" required="" type="text"/>
+                                <div class="fieldDescription">
+                                    The OIDC client ID for this Jellyfin instance, configured on the provider side.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="OidSecret">Client Secret</label>
+
+                                <div style="display: flex; align-items: center; gap: 0.5em;">
+                                    <input class="oidc-text" id="OidSecret" is="emby-input" required=""
+                                           style="flex-grow: 1; margin: 0;"
+                                           type="password"/>
+                                    <button class="emby-button" id="ToggleSecret" is="paper-icon-button-light"
+                                            style="flex-shrink: 0;" title="Toggle Visibility" type="button">
+                                        <span class="material-icons">visibility</span>
+                                    </button>
+                                </div>
+
+                                <div class="fieldDescription">
+                                    The OIDC client secret. Randomly generated and shared between server and provider.
+                                </div>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input checked class="oidc-toggle" id="Enabled" is="emby-checkbox"
+                                           name="Enabled" type="checkbox"/>
+                                    <span>Enable this Provider</span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">User Access &amp; Permissions</h3>
+                        <div class="collapseContent">
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input class="oidc-toggle" id="EnableAuthorization" is="emby-checkbox"
+                                           name="EnableAuthorization" type="checkbox"/>
+                                    <span>Auto-set Permissions on Login</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    If enabled, the plugin sets permissions for users on first login.
+                                    Existing users' permissions are not rewritten on subsequent logins.
+                                    If disabled, an admin must grant permissions manually.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="Roles">Allowed Roles</label>
+                                <textarea class="oidc-line-list emby-textarea" id="Roles" is="emby-textarea"
+                                          placeholder="admin&#10;user&#10;editor"></textarea>
+                                <div class="fieldDescription">
+                                    One role per line. If the user has any of these roles in their OIDC response,
+                                    they are authenticated. Leave blank to disable role checking.
+                                    Validated against <strong>Role Claim</strong>.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="AdminRoles">Admin Roles</label>
+                                <textarea class="oidc-line-list emby-textarea" id="AdminRoles" is="emby-textarea"
+                                          placeholder="jellyfin_admin"></textarea>
+                                <div class="fieldDescription">
+                                    One role per line. Users with any of these roles receive admin privileges.
+                                    Leave blank to not auto-grant admin.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="RoleClaim">Role Claim Path</label>
+                                <input class="oidc-text" id="RoleClaim" is="emby-input" placeholder="groups"
+                                       required=""
+                                       type="text"/>
+                                <div class="fieldDescription">
+                                    The JSON path in the OIDC response to check for roles.
+                                    Use <code>\.</code> for literal dots.
+                                    <br/>
+                                    <strong>Keycloak:</strong> <code>realm_access.roles</code> (realm) or
+                                    <code>resource_access.&gt;clientId&lt;.roles</code> (client)
+                                    <br/>
+                                    <strong>Authelia:</strong> <code>groups</code>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Library Access</h3>
+                        <div class="collapseContent">
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input class="oidc-toggle" id="EnableAllFolders" is="emby-checkbox"
+                                           name="EnableAllFolders" type="checkbox"/>
+                                    <span>Grant Access to All Libraries</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    If enabled, users logging in through this provider can access every library.
+                                    If disabled, select specific libraries below.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer" id="Container-EnabledFolders">
+                                <label class="inputLabel inputLabelUnfocused" for="EnabledFolders">Enabled
+                                    Libraries</label>
+                                <div
+                                    class="checkboxList paperList checkboxList-paperList oidc-folder-list oidc-bordered-list"
+                                    id="EnabledFolders"></div>
+                                <div class="fieldDescription">
+                                    Only applies when <strong>"Grant Access to All Libraries"</strong> is disabled.
+                                </div>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription"
+                                 id="Container-EnableFolderRoles">
+                                <label>
+                                    <input class="oidc-toggle" id="EnableFolderRoles" is="emby-checkbox"
+                                           name="EnableFolderRoles" type="checkbox"/>
+                                    <span>Role-Based Library Access</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    If enabled, user roles determine which libraries are accessible.
+                                    Configure the mapping below.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer" id="Container-FolderRoleMapping">
+                                <label class="inputLabel inputLabelUnfocused" for="FolderRoleMapping">
+                                    Role &rarr; Library Mappings
+                                    <button class="fab btnAddFolder submit" id="AddRoleMapping" is="emby-button"
+                                            style="margin-left: 0.5em;" title="${Add}" type="button">
+                                        <span aria-hidden="true" class="material-icons add"></span>
+                                    </button>
+                                </label>
+                                <div class="oidc-role-map" id="FolderRoleMapping"></div>
+                                <div class="fieldDescription">
+                                    Map roles (from <strong>Role Claim</strong>) to libraries.
+                                    Only applies when <strong>Role-Based Library Access</strong> is enabled.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Live TV</h3>
+                        <div class="collapseContent">
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input class="oidc-toggle" id="EnableLiveTv" is="emby-checkbox" name="EnableLiveTv"
+                                           type="checkbox"/>
+                                    <span>Grant Live TV Access by Default</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    Still used even when Live TV RBAC is enabled.
+                                </div>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input class="oidc-toggle" id="EnableLiveTvManagement" is="emby-checkbox"
+                                           name="EnableLiveTvManagement" type="checkbox"/>
+                                    <span>Grant Live TV Management by Default</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    Still used even when Live TV RBAC is enabled.
+                                </div>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription"
+                                 id="Container-EnableLiveTvRoles">
+                                <label>
+                                    <input class="oidc-toggle" id="EnableLiveTvRoles" is="emby-checkbox"
+                                           name="EnableLiveTvRoles" type="checkbox"/>
+                                    <span>Enable Live TV Role-Based Access</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    Use roles to grant Live TV privileges.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer" id="Container-LiveTvRoles">
+                                <label class="inputLabel inputLabelUnfocused" for="LiveTvRoles">Live TV Viewing
+                                    Roles</label>
+                                <textarea class="oidc-line-list emby-textarea" id="LiveTvRoles" is="emby-textarea"
+                                          placeholder="live_tv_viewer"></textarea>
+                                <div class="fieldDescription">
+                                    One role per line. Users with any of these roles can view Live TV.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer" id="Container-LiveTvManagementRoles">
+                                <label class="inputLabel inputLabelUnfocused" for="LiveTvManagementRoles">Live TV
+                                    Management Roles</label>
+                                <textarea class="oidc-line-list emby-textarea" id="LiveTvManagementRoles"
+                                          is="emby-textarea" placeholder="live_tv_admin"></textarea>
+                                <div class="fieldDescription">
+                                    One role per line. Users with any of these roles can manage Live TV.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection">
+                        <h3 class="sectionTitle">Advanced Options</h3>
+                        <div class="collapseContent">
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="OidScopes">Additional Scopes</label>
+                                <textarea class="oidc-line-list emby-textarea" id="OidScopes" is="emby-textarea"
+                                          placeholder="profile&#10;email&#10;groups"></textarea>
+                                <div class="fieldDescription">
+                                    One scope per line. Some providers (e.g. Authelia) require additional scopes
+                                    for group membership validation. Leave blank for default scopes only.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="DefaultUsernameClaim">Default
+                                    Username Claim</label>
+                                <input class="oidc-text" id="DefaultUsernameClaim" is="emby-input"
+                                       placeholder="preferred_username"
+                                       type="text"/>
+                                <div class="fieldDescription">
+                                    The claim to use for the username. Defaults to <code>preferred_username</code>.
+                                </div>
+                            </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="AvatarUrlFormat">Avatar URL
+                                    Template</label>
+                                <input class="oidc-text" id="AvatarUrlFormat" is="emby-input"
+                                       placeholder="https://example.com/@{user_id}.png"
+                                       type="text"/>
+                                <div class="fieldDescription">
+                                    URL template for user avatars. Use <code>{user_id}</code> as a placeholder.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="verticalSection oidc-danger-section">
+                        <h3 class="sectionTitle">Insecure Options</h3>
+                        <div class="collapseContent">
+                            <div class="oidc-danger-header">
+                                <span class="material-icons"
+                                      style="vertical-align: middle; color: #ff000055;">warning</span>
+                                These options reduce can/will security. Only enable if your provider requires it.
+                            </div>
+
+                            <div class="checkboxContainer">
+                                <label>
+                                    <input class="oidc-toggle" id="DisableHttps" is="emby-checkbox" name="DisableHttps"
+                                           type="checkbox"/>
+                                    <span>Disable HTTPS Discovery</span>
+                                </label>
+                            </div>
+
+                            <div class="checkboxContainer">
+                                <label>
+                                    <input class="oidc-toggle" id="DisablePushedAuthorization" is="emby-checkbox"
+                                           name="DisablePushedAuthorization" type="checkbox"/>
+                                    <span>Disable Pushed Authorization (May be needed for Authelia)</span>
+                                </label>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input class="oidc-toggle" id="DoNotValidateEndpoints" is="emby-checkbox"
+                                           name="DoNotValidateEndpoints" type="checkbox"/>
+                                    <span>Skip Endpoint Validation (May be needed for Google)</span>
+                                </label>
+                            </div>
+
+                            <div class="checkboxContainer">
+                                <label>
+                                    <input class="oidc-toggle" id="DoNotValidateIssuerName" is="emby-checkbox"
+                                           name="DoNotValidateIssuerName" type="checkbox"/>
+                                    <span>Skip Issuer Validation</span>
+                                </label>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input class="oidc-toggle" id="DoNotLoadProfile" is="emby-checkbox"
+                                           name="DoNotLoadProfile" type="checkbox"/>
+                                    <span>Skip Profile Loading (May be needed for Cloudflare)</span>
+                                </label>
+                            </div>
+
+                            <div class="checkboxContainer">
+                                <label>
+                                    <input class="oidc-toggle" id="UseHTTP" is="emby-checkbox" name="UseHTTP"
+                                           type="checkbox"/>
+                                    <span>Use http in redirects instead of https.</span>
+                                </label>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label class="inputLabel inputLabelUnfocused" for="PortOverride">Port Override</label>
+                                <input class="oidc-text" id="PortOverride" is="emby-input" placeholder="443"
+                                       type="text"/>
+                                <div class="fieldDescription">
+                                    If the plugin redirects to the wrong port, override it here.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="oidc-action-bar">
+                        <button class="raised button-submit emby-button" id="SaveProvider" is="emby-button"
+                                type="button">
+                            <span class="material-icons" style="vertical-align: middle; font-size: 1.2em;">save</span>
+                            Save Provider
+                        </button>
+                        <button class="raised button-delete emby-button" id="DeleteProvider" is="emby-button"
+                                type="button">
+                            <span class="material-icons" style="vertical-align: middle; font-size: 1.2em;">delete</span>
+                            Delete Provider
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>

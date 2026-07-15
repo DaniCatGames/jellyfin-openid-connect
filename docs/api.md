@@ -46,7 +46,7 @@ These all require authorization. Append an API key to the end of the request: `c
   - `disableHttps`: boolean. Determines whether the OpenID discovery endpoint requires HTTPS.
   - `doNotValidateEndpoints`: boolean. Determines whether the OpenID discovery process will validate endpoints. This may be required for Google.
   - `doNotValidateIssuerName`: boolean. Determines whether the OpenID discovery process will validate the OpenID issuer name.
-  - `schemeOverride`: string. Sets the scheme for URLs used. Can be useful if the plugin refuses to use HTTPS URLs.
+  - `useHTTP`: boolean. Force the plugin to use HTTP, can be useful when your provider in on an internal network and uses http.
 - GET `Del/PROVIDER_NAME`: This removes a configuration for OpenID for a given provider name.
 - GET `Get`: Lists the configurations currently available.
 - GET `States`: Lists currently active OpenID flows in progress.

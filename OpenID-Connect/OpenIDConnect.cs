@@ -39,7 +39,7 @@ public class OpenIDConnect : BasePlugin<PluginConfiguration>, IPlugin, IHasWebPa
             new PluginPageInfo
             {
                 Name = "openid-connect",
-                EmbeddedResourcePath = $"{GetType().Namespace}.Config.configPage.html",
+                EmbeddedResourcePath = $"{GetType().Namespace}.Config.config.html",
             },
             new PluginPageInfo
             {

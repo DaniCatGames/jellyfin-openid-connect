@@ -38,8 +38,9 @@ This is 100% alpha software! PRs are welcome to improve the code.
 - [ ] Expose js function to automatically create login page links
 - [ ] Use refresh token to (optionally?) allow for stuff like disabling account from IdP
 - [ ] Settings for account takeover/creation from IdP
-- [ ] Update configuration UI
+- [x] Update configuration UI
 - [ ] Update documentation to reflect changes
+- [ ] Add way to test configured provider
 
 ## Tested Providers
 
@@ -89,7 +90,7 @@ See [Building & Releasing](docs/building.md) for instructions on how to build fr
 
 Logging in with an OIDC account that has the same username as an existing Jellyfin account will override the permissions for the user. Use caution when overriding the administrator account!
 
-There is no GUI to sign in. You have to make it yourself! The buttons should redirect to something like this: [https://jellyfin.example.com/OpenIDConnect/start/<provider name>](https://myjellyfin.example.com/sso/OID/start/clientid) replacing `<provider name>` with the name of the provider in your config.
+There is no GUI to sign in. You have to make it yourself! The buttons should redirect to something like this: `https://jellyfin.example.com/OpenIDConnect/start/<provider name>` replacing `<provider name>` with the name of the provider in your config.
 
 There is also no logout callback. Logging out of Jellyfin will log you out of Jellyfin only, instead of the SSO provider as well.
 
