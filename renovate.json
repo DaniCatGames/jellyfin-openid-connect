@@ -1,12 +1,23 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended", "helpers:pinGitHubActionDigests"],
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
   "semanticCommits": "enabled",
   "packageRules": [
     {
-      "matchManagers": ["nuget"],
-      "matchPackageNames": ["Jellyfin.Controller", "Jellyfin.Model"],
+      "matchManagers": [
+        "nuget"
+      ],
+      "matchPackageNames": [
+        "Jellyfin.Controller",
+        "Jellyfin.Model"
+      ],
       "groupName": "Jellyfin packages"
     }
+  ],
+  "ignoreDeps": [
+    "dotnet-sdk"
   ]
 }
