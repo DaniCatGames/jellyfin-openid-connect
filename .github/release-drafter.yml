@@ -17,7 +17,7 @@ categories:
   - title: ":wastebasket:️ Deprecated"
     label: deprecated
   - title: ":tada: New features and improvements"
-    labels: [enhancement, feature]
+    labels: [enhancement, feature, feat]
   - title: ":bug: Bug Fixes"
     labels: [bug, fix, bugfix, regression]
   - title: ":gear: Code or Repo Maintenance"
