@@ -21,7 +21,6 @@ using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Net;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Controller.Session;
-using MediaBrowser.Model.Cryptography;
 using MediaBrowser.Model.Users;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
@@ -43,7 +42,6 @@ public class OpenIDConnectController : ControllerBase
         new ConcurrentDictionary<string, TimedAuthorizeState>();
 
     private readonly IAuthorizationContext _authContext;
-    private readonly ICryptoProvider _cryptoProvider;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<OpenIDConnectController> _logger;
     private readonly ILoggerFactory _loggerFactory;
@@ -60,7 +58,6 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="sessionManager">Instance of the <see cref="ISessionManager" /> interface.</param>
     /// <param name="authContext">Instance of the <see cref="IAuthorizationContext" /> interface.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager" /> interface.</param>
-    /// <param name="cryptoProvider">Instance of the <see cref="ICryptoProvider" /> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager" /> interface.</param>
     /// <param name="httpClientFactory">Instance of the <see cref="IHttpClientFactory" /> interface.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager" /> interface.</param>
@@ -70,7 +67,6 @@ public class OpenIDConnectController : ControllerBase
         ISessionManager sessionManager,
         IUserManager userManager,
         IAuthorizationContext authContext,
-        ICryptoProvider cryptoProvider,
         IProviderManager providerManager,
         IHttpClientFactory httpClientFactory,
         IServerConfigurationManager serverConfigurationManager)
@@ -78,7 +74,6 @@ public class OpenIDConnectController : ControllerBase
         _sessionManager = sessionManager;
         _userManager = userManager;
         _authContext = authContext;
-        _cryptoProvider = cryptoProvider;
         _logger = logger;
         _loggerFactory = loggerFactory;
         _providerManager = providerManager;
@@ -209,25 +204,24 @@ public class OpenIDConnectController : ControllerBase
             }
         }
 
-        bool isLinking = timedState.IsLinking;
-
-        if (timedState.Valid)
+        if (!timedState.Valid)
         {
-            _logger.LogInformation($"Is request linking: {isLinking}");
-            return Content(WebResponse.Generator(state,
-                    provider,
-                    GetRequestBase(config.UseHTTP, config.PortOverride),
-                    isLinking),
-                MediaTypeNames.Text.Html);
+            _logger.LogWarning(
+                "OpenID user {Username} has one or more incorrect role claims: {@Claims}. Expected any one of: {@ExpectedClaims}",
+                timedState.Username,
+                result.User.Claims.Select(o => new { o.Type, o.Value }),
+                config.Roles);
+
+            return Unauthorized("Error. Check permissions.");
         }
 
-        _logger.LogWarning(
-            "OpenID user {Username} has one or more incorrect role claims: {@Claims}. Expected any one of: {@ExpectedClaims}",
-            timedState.Username,
-            result.User.Claims.Select(o => new { o.Type, o.Value }),
-            config.Roles);
-
-        return ReturnError(StatusCodes.Status401Unauthorized, "Error. Check permissions.");
+        bool isLinking = timedState.IsLinking;
+        _logger.LogInformation($"Is request linking: {isLinking}");
+        return Content(WebResponse.Generator(state,
+                provider,
+                GetRequestBase(config.UseHTTP, config.PortOverride),
+                isLinking),
+            MediaTypeNames.Text.Html);
     }
 
     private OidcClient CreateClient(string provider, OidConfig config, out ActionResult configError)
@@ -712,8 +706,7 @@ public class OpenIDConnectController : ControllerBase
 
         if (linkedId != jellyfinUserId)
         {
-            return StatusCode(StatusCodes.Status409Conflict,
-                "jellyfin UID does not match id registered to that canonical name.");
+            return Conflict("Jellyfin User ID does not match the user id registered to that canonical name.");
         }
 
         SerializableDictionary<string, Guid> links = GetCanonicalLinks(provider);
