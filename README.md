@@ -34,9 +34,7 @@ This is 100% alpha software! PRs are welcome to improve the code.
 - [x] Fix account linking
 - [ ] RP Initiated Logout for browser sessions
 - [ ] Use 'picture' claim for avatar syncing
-- [ ] Fix some links on the config page
 - [ ] Expose js function to automatically create login page links
-- [ ] Use refresh token to (optionally?) allow for stuff like disabling account from IdP
 - [ ] Settings for account takeover/creation from IdP
 - [x] Update configuration UI
 - [ ] Update documentation to reflect changes

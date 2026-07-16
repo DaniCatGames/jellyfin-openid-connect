@@ -95,7 +95,7 @@ public class OpenIDConnectController : ControllerBase
     /// <returns>A webpage that will complete the client-side flow.</returns>
     // Actually a GET: https://github.com/IdentityModel/IdentityModel.OidcClient/issues/325
     [HttpGet("redirect/{provider}")]
-    public async Task<ActionResult> OidCallback(
+    public async Task<ActionResult> Callback(
         [FromRoute] string provider,
         [FromQuery] string state)
     {
@@ -126,7 +126,7 @@ public class OpenIDConnectController : ControllerBase
             return BadRequest("Invalid or expired state");
         }
 
-        OidcClient oidcClient = CreateOidcClient(provider, config, out ActionResult configError);
+        OidcClient oidcClient = CreateClient(provider, config, out ActionResult configError);
         if (configError != null)
         {
             return configError;
@@ -230,7 +230,7 @@ public class OpenIDConnectController : ControllerBase
         return ReturnError(StatusCodes.Status401Unauthorized, "Error. Check permissions.");
     }
 
-    private OidcClient CreateOidcClient(string provider, OidConfig config, out ActionResult configError)
+    private OidcClient CreateClient(string provider, OidConfig config, out ActionResult configError)
     {
         string endpoint = config.OidEndpoint.Trim();
         if (string.IsNullOrEmpty(endpoint))
@@ -388,7 +388,7 @@ public class OpenIDConnectController : ControllerBase
             if (config.EnableLiveTvRoles)
             {
                 // Check if allowed Live TV based on roles
-                if (config.LiveTvRoles != null && config.LiveTvRoles.Any())
+                if (config.LiveTvRoles != null && config.LiveTvRoles.Length != 0)
                 {
                     foreach (string validLiveTvRoles in config.LiveTvRoles)
                     {
@@ -400,7 +400,7 @@ public class OpenIDConnectController : ControllerBase
                 }
 
                 // Check if allowed Live TV management based on roles
-                if (config.LiveTvManagementRoles != null && config.LiveTvManagementRoles.Any())
+                if (config.LiveTvManagementRoles != null && config.LiveTvManagementRoles.Length != 0)
                 {
                     foreach (string validLiveTvManagementRoles in config.LiveTvManagementRoles)
                     {
@@ -421,7 +421,7 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="isLinking">Whether or not this request is to link accounts (Rather than authenticate).</param>
     /// <returns>An asynchronous result for the authentication.</returns>
     [HttpGet("start/{provider}")]
-    public async Task<ActionResult> OidChallenge(string provider, [FromQuery] bool isLinking = false)
+    public async Task<ActionResult> Challenge(string provider, [FromQuery] bool isLinking = false)
     {
         Invalidate();
         OidConfig config;
@@ -440,7 +440,7 @@ public class OpenIDConnectController : ControllerBase
             throw new ArgumentException("Provider does not exist");
         }
 
-        OidcClient oidcClient = CreateOidcClient(provider, config, out ActionResult configError);
+        OidcClient oidcClient = CreateClient(provider, config, out ActionResult configError);
         if (configError != null)
         {
             return configError;
@@ -471,7 +471,7 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="config">The OID configuration (deserialized from a JSON post).</param>
     [Authorize(Policy = Policies.RequiresElevation)]
     [HttpPost("Add/{provider}")]
-    public static void OidAdd(string provider, [FromBody] OidConfig config)
+    public static void AddProvider(string provider, [FromBody] OidConfig config)
     {
         PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
         configuration.OidConfigs[provider] = config;
@@ -484,7 +484,7 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="provider">Name of provider to delete.</param>
     [Authorize(Policy = Policies.RequiresElevation)]
     [HttpGet("Del/{provider}")]
-    public static void OidDel(string provider)
+    public static void DeleteProvider(string provider)
     {
         PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
         configuration.OidConfigs.Remove(provider);
@@ -497,7 +497,7 @@ public class OpenIDConnectController : ControllerBase
     /// <returns>The list of OpenID configurations.</returns>
     [Authorize(Policy = Policies.RequiresElevation)]
     [HttpGet("Get")]
-    public ActionResult OidProviders()
+    public ActionResult GetProviders()
     {
         return Ok(OpenIDConnect.Instance.Configuration.OidConfigs);
     }
@@ -507,7 +507,7 @@ public class OpenIDConnectController : ControllerBase
     /// </summary>
     /// <returns>The list of OpenID configurations.</returns>
     [HttpGet("GetNames")]
-    public ActionResult OidProviderNames()
+    public ActionResult GetProviderNames()
     {
         return Ok(OpenIDConnect.Instance.Configuration.OidConfigs.Keys);
     }
@@ -518,7 +518,7 @@ public class OpenIDConnectController : ControllerBase
     /// <returns>The list of OpenID flows in progress.</returns>
     [Authorize(Policy = Policies.RequiresElevation)]
     [HttpGet("States")]
-    public ActionResult OidStates()
+    public ActionResult GetRunningFlows()
     {
         return Ok(StateManager);
     }
@@ -532,60 +532,59 @@ public class OpenIDConnectController : ControllerBase
     [HttpPost("Auth/{provider}")]
     [Consumes(MediaTypeNames.Application.Json)]
     [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult> OidAuth(string provider, [FromBody] AuthResponse response)
+    public async Task<ActionResult> Authenticate(string provider, [FromBody] AuthResponse response)
     {
         OidConfig config;
         try
         {
             config = OpenIDConnect.Instance.Configuration.OidConfigs[provider];
+
+            if (!config.Enabled)
+            {
+                throw new KeyNotFoundException();
+            }
         }
         catch (KeyNotFoundException)
         {
             return BadRequest("No matching provider found");
         }
 
-        if (!config.Enabled)
+        if (!StateManager.TryGetValue(response.Data, out TimedAuthorizeState timedState))
         {
-            return Problem("Something went wrong");
+            return Problem("State not found");
         }
 
-        if (StateManager.TryGetValue(response.Data, out TimedAuthorizeState timedState))
+        if (!timedState.Valid || timedState.Created < DateTime.UtcNow.AddMinutes(-1))
         {
-            StateManager.TryRemove(response.Data, out _);
-
-            // check if state is still valid
-            if (timedState.Valid && timedState.Created >= DateTime.UtcNow.AddMinutes(-1))
-            {
-                Guid userId = await CreateCanonicalLinkAndUserIfNotExist(provider, timedState.Username);
-
-                AuthenticationResult authenticationResult = await Authenticate(
-                        userId,
-                        timedState.Admin,
-                        config.EnableAuthorization,
-                        config.EnableAllFolders,
-                        timedState.Folders.ToArray(),
-                        timedState.EnableLiveTv,
-                        timedState.EnableLiveTvManagement,
-                        response,
-                        timedState.AvatarURL)
-                    .ConfigureAwait(false);
-
-                return Ok(authenticationResult);
-            }
+            return Problem("State is not valid.");
         }
 
-        return Problem("Something went wrong");
+        Guid userId = await CreateCanonicalLinkAndUserIfNotExist(provider, timedState.Username);
+        AuthenticationResult authenticationResult = await AuthenticateUser(
+                userId,
+                timedState.Admin,
+                config.EnableAuthorization,
+                config.EnableAllFolders,
+                timedState.Folders.ToArray(),
+                timedState.EnableLiveTv,
+                timedState.EnableLiveTvManagement,
+                response,
+                timedState.AvatarURL)
+            .ConfigureAwait(false);
+
+        StateManager.TryRemove(response.Data, out _);
+        return Ok(authenticationResult);
     }
 
     /// <summary>
     ///     Removes a user from SSO auth and switches it back to another auth provider. Requires administrator privileges.
     /// </summary>
     /// <param name="username">The username to switch to the new provider.</param>
-    /// <param name="provider">The new provider to switch to.</param>
+    /// <param name="provider">The new jellyfin auth provider to switch to (not an IdP).</param>
     /// <returns>Whether this API endpoint succeeded.</returns>
     [Authorize(Policy = Policies.RequiresElevation)]
     [HttpPost("Unregister/{username}")]
-    public async Task<ActionResult> Unregister(string username, [FromBody] string provider)
+    public async Task<ActionResult> UnregisterUserFromOidc(string username, [FromBody] string provider)
     {
         // TODO: better safety checks
         User user = _userManager.GetUserByName(username);
@@ -683,7 +682,7 @@ public class OpenIDConnectController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, "User is not allowed to link SSO providers.");
         }
 
-        return OidLink(provider, jellyfinUserId, authResponse);
+        return Link(provider, jellyfinUserId, authResponse);
     }
 
     /// <summary>
@@ -725,14 +724,14 @@ public class OpenIDConnectController : ControllerBase
     }
 
     /// <summary>
-    ///     Gets all the oid links for a user.
+    ///     Gets all the canonical links for a user.
     /// </summary>
     /// <param name="jellyfinUserId">The user ID within jellyfin for which to return the links.</param>
     /// <returns>A dictionary of provider : link mappings.</returns>
     [Authorize]
     [HttpGet("Links/{jellyfinUserId}")]
     [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult<SerializableDictionary<string, IEnumerable<string>>>> GetOidLinksByUser(
+    public async Task<ActionResult<SerializableDictionary<string, IEnumerable<string>>>> GetLinksByUser(
         Guid jellyfinUserId)
     {
         if (!await RequestHelpers.AssertCanUpdateUser(_authContext, HttpContext.Request, jellyfinUserId, true)
@@ -767,28 +766,26 @@ public class OpenIDConnectController : ControllerBase
     /// <returns>JSON for the client to populate information with.</returns>
     [Consumes(MediaTypeNames.Application.Json)]
     [Produces(MediaTypeNames.Application.Json)]
-    private ActionResult OidLink(string provider, Guid jellyfinUserId, AuthResponse response)
+    private ActionResult Link(string provider, Guid jellyfinUserId, AuthResponse response)
     {
-        try
-        {
-            OidConfig config = OpenIDConnect.Instance.Configuration.OidConfigs[provider];
-        }
-        catch (KeyNotFoundException)
+        if (!OpenIDConnect.Instance.Configuration.OidConfigs.TryGetValue(provider, out _))
         {
             return BadRequest("No matching provider found");
         }
 
-        if (StateManager.TryGetValue(response.Data, out TimedAuthorizeState timedState))
+        if (!StateManager.TryGetValue(response.Data, out TimedAuthorizeState timedState))
         {
-            // check if state is still valid
-            if (timedState.Valid && timedState.Created >= DateTime.UtcNow.AddMinutes(-1))
-            {
-                StateManager.TryRemove(response.Data, out _);
-                return CreateCanonicalLink(provider, jellyfinUserId, timedState.Username);
-            }
+            return Problem("State not found");
         }
 
-        return Problem("Something went wrong!");
+        // check if state is still valid
+        if (!timedState.Valid || timedState.Created < DateTime.UtcNow.AddMinutes(-1))
+        {
+            return Problem("State is not valid");
+        }
+
+        StateManager.TryRemove(response.Data, out _);
+        return CreateCanonicalLink(provider, jellyfinUserId, timedState.Username);
     }
 
     private ActionResult CreateCanonicalLink(string provider, [FromRoute] Guid jellyfinUserId, string providerUserId)
@@ -829,7 +826,7 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="enableLiveTvAdmin">Determines whether live TV can be managed by this user.</param>
     /// <param name="authResponse">The client information to authenticate the user with.</param>
     /// <param name="avatarUrl">The new avatar url for the user.</param>
-    private async Task<AuthenticationResult> Authenticate(
+    private async Task<AuthenticationResult> AuthenticateUser(
         Guid userId,
         bool isAdmin,
         bool enableAuthorization,
@@ -962,16 +959,7 @@ public class OpenIDConnectController : ControllerBase
 
     private string GetRequestBase(bool useHttp = false, int? portOverride = null)
     {
-        int requestPort;
-
-        if (portOverride != null)
-        {
-            requestPort = portOverride.Value;
-        }
-        else
-        {
-            requestPort = Request.Host.Port ?? -1;
-        }
+        int requestPort = portOverride ?? Request.Host.Port ?? -1;
 
         if (requestPort == 80 && string.Equals(Request.Scheme, "http", StringComparison.OrdinalIgnoreCase)
             || requestPort == 443 && string.Equals(Request.Scheme, "https", StringComparison.OrdinalIgnoreCase))
