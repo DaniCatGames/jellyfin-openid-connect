@@ -702,7 +702,9 @@ public class OpenIDConnectController : ControllerBase
         foreach (string providerName in providerList.Keys)
         {
             SerializableDictionary<string, Guid> canonLinks = providerList[providerName].CanonicalLinks;
-            IEnumerable<string> canonKeys = from link in canonLinks where link.Value == jellyfinUserId select link.Key;
+            IEnumerable<string> canonKeys = canonLinks
+                .Where(link => link.Value == jellyfinUserId)
+                .Select(link => link.Key);
             mappings[providerName] = canonKeys;
         }
 
