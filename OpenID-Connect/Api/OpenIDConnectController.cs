@@ -932,17 +932,6 @@ public class OpenIDConnectController : ControllerBase
             Path = Request.PathBase,
         }.ToString().TrimEnd('/');
     }
-
-    private static ContentResult ReturnError(int code, string message)
-    {
-        var errorResult = new ContentResult
-        {
-            Content = message,
-            ContentType = MediaTypeNames.Text.Plain,
-            StatusCode = code,
-        };
-        return errorResult;
-    }
 }
 
 /// <summary>
