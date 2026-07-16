@@ -172,7 +172,7 @@ public class OpenIDConnectController : ControllerBase
 
         Claim usernameClaim = result.User.Claims.FirstOrDefault(claim =>
             claim.Type == (config.DefaultUsernameClaim?.Trim() ?? "preferred_username"));
-        
+
         if (usernameClaim != null)
         {
             timedState.Username = usernameClaim.Value;
@@ -539,8 +539,11 @@ public class OpenIDConnectController : ControllerBase
     [HttpPost("Unregister/{username}")]
     public async Task<ActionResult> UnregisterUserFromOidc(string username, [FromBody] string provider)
     {
-        // TODO: better safety checks
         User user = _userManager.GetUserByName(username);
+        if (user == null)
+        {
+            return NotFound("User not found");
+        }
         user.AuthenticationProviderId = provider;
         await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
 
