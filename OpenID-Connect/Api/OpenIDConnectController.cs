@@ -97,16 +97,7 @@ public class OpenIDConnectController : ControllerBase
         OidConfig config;
 
         // If the config doesn't have an active provider matching the requeset, show an error
-        try
-        {
-            config = OpenIDConnect.Instance.Configuration.OidConfigs[provider];
-
-            if (!config.Enabled)
-            {
-                throw new KeyNotFoundException();
-            }
-        }
-        catch (KeyNotFoundException)
+        if (!OpenIDConnect.Instance.Configuration.OidConfigs.TryGetValue(provider, out config) || !config.Enabled)
         {
             return BadRequest("No matching provider found");
         }
@@ -157,20 +148,11 @@ public class OpenIDConnectController : ControllerBase
 
         foreach (Claim claim in result.User.Claims)
         {
-            if (claim.Type == (config.DefaultUsernameClaim?.Trim() ?? "preferred_username"))
-            {
-                timedState.Username = claim.Value;
-                if (config.Roles == null || config.Roles.Length == 0)
-                {
-                    timedState.Valid = true;
-                }
-            }
-
             // Role processing
             // The regex matches any "." not preceded by a "\": a.b.c will be split into a, b, and c, but a.b\.c will be split into a, b.c (after processing the escaped dots)
             // We have to first process the RoleClaim string
             string[] segments = string.IsNullOrEmpty(config.RoleClaim)
-                ? Array.Empty<string>()
+                ? []
                 : Regex.Split(config.RoleClaim.Trim(), @"(?<!\\)\.");
 
             if (segments.Length == 0 || segments[0] == "")
@@ -188,18 +170,27 @@ public class OpenIDConnectController : ControllerBase
             }
         }
 
-        // If the provider doesn't support the preferred username claim, then use the sub claim
-        if (!timedState.Valid)
+        Claim usernameClaim = result.User.Claims.FirstOrDefault(claim =>
+            claim.Type == (config.DefaultUsernameClaim?.Trim() ?? "preferred_username"));
+        
+        if (usernameClaim != null)
         {
-            foreach (Claim claim in result.User.Claims)
+            timedState.Username = usernameClaim.Value;
+            if (config.Roles == null || config.Roles.Length == 0)
             {
-                if (claim.Type == "sub")
+                timedState.Valid = true;
+            }
+        }
+        else
+        {
+            // Fallback to the sub as a username
+            Claim subClaim = result.User.Claims.FirstOrDefault(claim => claim.Type == "sub");
+            if (subClaim != null)
+            {
+                timedState.Username = subClaim.Value;
+                if (config.Roles == null || config.Roles.Length == 0)
                 {
-                    timedState.Username = claim.Value;
-                    if (config.Roles == null || config.Roles.Length == 0)
-                    {
-                        timedState.Valid = true;
-                    }
+                    timedState.Valid = true;
                 }
             }
         }
@@ -344,65 +335,42 @@ public class OpenIDConnectController : ControllerBase
         foreach (string role in roles)
         {
             // Check if allowed to login based on roles
-            if (config.Roles != null && config.Roles.Length != 0)
+            if (config.Roles?.Contains(role) ?? false)
             {
-                foreach (string validRoles in config.Roles)
-                {
-                    if (role.Equals(validRoles))
-                    {
-                        timedState.Valid = true;
-                    }
-                }
+                timedState.Valid = true;
             }
 
             // Check if admin based on roles
-            if (config.AdminRoles != null && config.AdminRoles.Length != 0)
+            if (config.AdminRoles?.Contains(role) ?? false)
             {
-                foreach (string validAdminRoles in config.AdminRoles)
-                {
-                    if (role.Equals(validAdminRoles))
-                    {
-                        timedState.Admin = true;
-                    }
-                }
+                timedState.Admin = true;
+                // Also allow login (as the user is an admin)
+                timedState.Valid = true;
             }
 
             // Get allowed folders from roles
             if (config.EnableFolderRoles)
             {
-                foreach (FolderRoleMap folderRoleMap in config.FolderRoleMapping)
+                foreach (FolderRoleMap map in config.FolderRoleMapping.Where(map =>
+                             role.Equals(map.Role.Trim(), StringComparison.Ordinal)))
                 {
-                    if (role.Equals(folderRoleMap.Role?.Trim()))
-                    {
-                        timedState.Folders.AddRange(folderRoleMap.Folders);
-                    }
+                    timedState.Folders.AddRange(map.Folders);
                 }
             }
 
             if (config.EnableLiveTvRoles)
             {
                 // Check if allowed Live TV based on roles
-                if (config.LiveTvRoles != null && config.LiveTvRoles.Length != 0)
+                if (config.LiveTvRoles?.Contains(role) ?? false)
                 {
-                    foreach (string validLiveTvRoles in config.LiveTvRoles)
-                    {
-                        if (role.Equals(validLiveTvRoles))
-                        {
-                            timedState.EnableLiveTv = true;
-                        }
-                    }
+                    timedState.EnableLiveTv = true;
                 }
 
+
                 // Check if allowed Live TV management based on roles
-                if (config.LiveTvManagementRoles != null && config.LiveTvManagementRoles.Length != 0)
+                if (config.LiveTvManagementRoles?.Contains(role) ?? false)
                 {
-                    foreach (string validLiveTvManagementRoles in config.LiveTvManagementRoles)
-                    {
-                        if (role.Equals(validLiveTvManagementRoles))
-                        {
-                            timedState.EnableLiveTvManagement = true;
-                        }
-                    }
+                    timedState.EnableLiveTvManagement = true;
                 }
             }
         }
@@ -418,18 +386,9 @@ public class OpenIDConnectController : ControllerBase
     public async Task<ActionResult> Challenge(string provider, [FromQuery] bool isLinking = false)
     {
         Invalidate();
-        OidConfig config;
 
-        try
-        {
-            config = OpenIDConnect.Instance.Configuration.OidConfigs[provider];
-
-            if (!config.Enabled)
-            {
-                throw new KeyNotFoundException();
-            }
-        }
-        catch (KeyNotFoundException)
+        if (!OpenIDConnect.Instance.Configuration.OidConfigs.TryGetValue(provider, out OidConfig config)
+            || !config.Enabled)
         {
             throw new ArgumentException("Provider does not exist");
         }
