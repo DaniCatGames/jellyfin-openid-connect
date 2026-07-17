@@ -94,10 +94,9 @@ public class OpenIDConnectController : ControllerBase
         [FromRoute] string provider,
         [FromQuery] string state)
     {
-        OidConfig config;
-
         // If the config doesn't have an active provider matching the requeset, show an error
-        if (!OpenIDConnect.Instance.Configuration.OidConfigs.TryGetValue(provider, out config) || !config.Enabled)
+        if (!OpenIDConnect.Instance.Configuration.OidConfigs.TryGetValue(provider, out OidConfig config)
+            || !config.Enabled)
         {
             return BadRequest("No matching provider found");
         }
@@ -416,54 +415,6 @@ public class OpenIDConnectController : ControllerBase
         return Redirect(state.StartUrl);
     }
 
-    /// <summary>
-    ///     Adds an OpenID auth configuration. Requires administrator privileges. If the provider already exists, it will be
-    ///     removed and readded.
-    /// </summary>
-    /// <param name="provider">The name of the provider to add.</param>
-    /// <param name="config">The OID configuration (deserialized from a JSON post).</param>
-    [Authorize(Policy = Policies.RequiresElevation)]
-    [HttpPost("Add/{provider}")]
-    public static void AddProvider(string provider, [FromBody] OidConfig config)
-    {
-        PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
-        configuration.OidConfigs[provider] = config;
-        OpenIDConnect.Instance.UpdateConfiguration(configuration);
-    }
-
-    /// <summary>
-    ///     Deletes an OpenID provider.
-    /// </summary>
-    /// <param name="provider">Name of provider to delete.</param>
-    [Authorize(Policy = Policies.RequiresElevation)]
-    [HttpGet("Del/{provider}")]
-    public static void DeleteProvider(string provider)
-    {
-        PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
-        configuration.OidConfigs.Remove(provider);
-        OpenIDConnect.Instance.UpdateConfiguration(configuration);
-    }
-
-    /// <summary>
-    ///     Lists the OpenID providers configured. Requires administrator privileges.
-    /// </summary>
-    /// <returns>The list of OpenID configurations.</returns>
-    [Authorize(Policy = Policies.RequiresElevation)]
-    [HttpGet("Get")]
-    public ActionResult GetProviders()
-    {
-        return Ok(OpenIDConnect.Instance.Configuration.OidConfigs);
-    }
-
-    /// <summary>
-    ///     Lists the OpenID providers names only.
-    /// </summary>
-    /// <returns>The list of OpenID configurations.</returns>
-    [HttpGet("GetNames")]
-    public ActionResult GetProviderNames()
-    {
-        return Ok(OpenIDConnect.Instance.Configuration.OidConfigs.Keys);
-    }
 
     /// <summary>
     ///     This is a debug endpoint to list all running OpenID flows. Requires administrator privileges.
@@ -544,6 +495,7 @@ public class OpenIDConnectController : ControllerBase
         {
             return NotFound("User not found");
         }
+
         user.AuthenticationProviderId = provider;
         await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
 
