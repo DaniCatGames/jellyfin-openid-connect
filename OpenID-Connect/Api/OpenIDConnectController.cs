@@ -438,19 +438,10 @@ public class OpenIDConnectController : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult> Authenticate(string provider, [FromBody] AuthResponse response)
     {
-        OidConfig config;
-        try
+        if (!OpenIDConnect.Instance.Configuration.OidConfigs.TryGetValue(provider, out OidConfig config)
+            || !config.Enabled)
         {
-            config = OpenIDConnect.Instance.Configuration.OidConfigs[provider];
-
-            if (!config.Enabled)
-            {
-                throw new KeyNotFoundException();
-            }
-        }
-        catch (KeyNotFoundException)
-        {
-            return BadRequest("No matching provider found");
+            return BadRequest("Provider does not exist");
         }
 
         if (!StateManager.TryGetValue(response.Data, out TimedAuthorizeState timedState))
