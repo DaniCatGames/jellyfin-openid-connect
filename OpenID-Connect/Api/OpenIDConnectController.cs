@@ -848,7 +848,7 @@ public class OpenIDConnectController : ControllerBase
             Username = user.Username,
             App = authResponse.AppName,
             AppVersion = authResponse.AppVersion,
-            DeviceId = authResponse.DeviceID,
+            DeviceId = authResponse.DeviceId,
             DeviceName = authResponse.DeviceName,
         };
         _logger.LogInformation("Auth request created...");
@@ -894,7 +894,7 @@ public class AuthResponse
     /// <summary>
     ///     Gets or sets the device ID of the client.
     /// </summary>
-    public string DeviceID { get; set; }
+    public string DeviceId { get; set; }
 
     /// <summary>
     ///     Gets or sets the device name of the client.

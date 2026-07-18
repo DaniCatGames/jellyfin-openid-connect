@@ -90,14 +90,14 @@
     }
 
     async function main() {
-        const data = "CS_DATA";
+        const Data = "CS_DATA";
 
-        const deviceId = localStorage.getItem("_deviceId2");
-        const appName = "Jellyfin Web";
-        const appVersion = "12.0.0";
-        const deviceName = getDeviceName();
+        const DeviceId = localStorage.getItem("_deviceId2");
+        const AppName = "Jellyfin Web";
+        const AppVersion = "12.0.0";
+        const DeviceName = getDeviceName();
 
-        const request = {deviceId, appName, appVersion, deviceName, data};
+        const request = {DeviceId, AppName, AppVersion, DeviceName, Data};
 
         let status;
 
