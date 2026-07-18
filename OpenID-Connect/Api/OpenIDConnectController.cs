@@ -18,12 +18,10 @@ using MediaBrowser.Common.Api;
 using MediaBrowser.Controller.Authentication;
 using MediaBrowser.Controller.Configuration;
 using MediaBrowser.Controller.Library;
-using MediaBrowser.Controller.Net;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Controller.Session;
 using MediaBrowser.Model.Users;
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -38,8 +36,8 @@ namespace Jellyfin.Plugin.OpenIDConnect.Api;
 [Route("[controller]")]
 public class OpenIDConnectController : ControllerBase
 {
-    private readonly IAuthorizationContext _authContext;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ILinkManager _linkManager;
     private readonly ILogger<OpenIDConnectController> _logger;
     private readonly ILoggerFactory _loggerFactory;
     private readonly IProviderManager _providerManager;
@@ -54,37 +52,38 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="logger">Instance of the <see cref="ILogger{OpenIDConnectController}" /> interface.</param>
     /// <param name="loggerFactory">Instance of the <see cref="ILoggerFactory" /> interface.</param>
     /// <param name="sessionManager">Instance of the <see cref="ISessionManager" /> interface.</param>
-    /// <param name="authContext">Instance of the <see cref="IAuthorizationContext" /> interface.</param>
     /// <param name="userManager">Instance of the <see cref="IUserManager" /> interface.</param>
     /// <param name="providerManager">Instance of the <see cref="IProviderManager" /> interface.</param>
     /// <param name="httpClientFactory">Instance of the <see cref="IHttpClientFactory" /> interface.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager" /> interface.</param>
     /// <param name="stateManager">Instance of the <see cref="IStateManager" /> interface.</param>
+    /// <param name="linkManager">Instance of the <see cref="ILinkManager" /> interface.</param>
     public OpenIDConnectController(
         ILogger<OpenIDConnectController> logger,
         ILoggerFactory loggerFactory,
         ISessionManager sessionManager,
         IUserManager userManager,
-        IAuthorizationContext authContext,
         IProviderManager providerManager,
         IHttpClientFactory httpClientFactory,
         IServerConfigurationManager serverConfigurationManager,
-        IStateManager stateManager)
+        IStateManager stateManager,
+        ILinkManager linkManager)
     {
         _sessionManager = sessionManager;
         _userManager = userManager;
-        _authContext = authContext;
         _logger = logger;
         _loggerFactory = loggerFactory;
         _providerManager = providerManager;
         _serverConfigurationManager = serverConfigurationManager;
         _httpClientFactory = httpClientFactory;
         _stateManager = stateManager;
+        _linkManager = linkManager;
         _logger.LogInformation("OpenID Connect Controller initialized");
     }
 
     /// <summary>
-    ///     The GET endpoint for OpenID provider to callback to. Returns a webpage that parses client data and completes auth.
+    ///     The GET endpoint for the OpenID provider to call back to. Returns a webpage that parses client data and completes
+    ///     auth.
     /// </summary>
     /// <param name="provider">The ID of the provider which will use the callback information.</param>
     /// <param name="state">The current request state.</param>
@@ -95,7 +94,7 @@ public class OpenIDConnectController : ControllerBase
         [FromRoute] string provider,
         [FromQuery] string state)
     {
-        // If the config doesn't have an active provider matching the requeset, show an error
+        // If the config doesn't have an active provider matching the request, show an error
         if (!OpenIDConnect.Instance.Configuration.OidConfigs.TryGetValue(provider, out OidConfig config)
             || !config.Enabled)
         {
@@ -485,31 +484,15 @@ public class OpenIDConnectController : ControllerBase
         user.AuthenticationProviderId = provider;
         await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
 
-        // TODO: remove zombie canconical links?
+        // TODO: remove zombie links?
         return Ok();
-    }
-
-    private static SerializableDictionary<string, Guid> GetCanonicalLinks(string provider)
-    {
-        SerializableDictionary<string, Guid> links = OpenIDConnect.Instance.Configuration.OidConfigs[provider]
-            .CanonicalLinks ?? new SerializableDictionary<string, Guid>();
-
-        return links;
     }
 
     // TODO: very unsafe, any user that sets their own preferred_username value to that of the jellyfin admin's username could take over the jellyfin admin account 
     private async Task<Guid> GetOrCreateUser(string provider, string sub, string canonicalName)
     {
-        // Check if there is already a link for this sub
-        Guid userId;
-        try
-        {
-            userId = GetCanonicalLink(provider, sub);
-        }
-        catch (KeyNotFoundException)
-        {
-            userId = Guid.Empty;
-        }
+        // Check if there is already a link for this sub, else get empty id
+        _linkManager.TryGetLink(provider, sub, out Guid userId);
 
         // Get the jellyfin user by userId from link, or IdP username (managed by IdP user!!! unsafe!!!) if there is no link
         User user = userId == Guid.Empty ? _userManager.GetUserByName(canonicalName) : _userManager.GetUserById(userId);
@@ -533,14 +516,11 @@ public class OpenIDConnectController : ControllerBase
             user.AuthenticationProviderId = "Jellyfin.Plugin.OpenIDConnect.AuthProvider";
             await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
 
-            // Make sure there aren't any trailing existing links
-            // TODO
-            SerializableDictionary<string, Guid> links = GetCanonicalLinks(provider);
-            links.Remove(sub);
-            UpdateCanonicalLinkConfig(links, provider);
+            // Make sure there aren't any trailing existing links, can happen if a user was deleted but the link wasn't
+            _linkManager.TryDeleteLink(provider, sub);
 
             // Link the provider and sub to the new user
-            CreateCanonicalLink(provider, userId, sub);
+            _linkManager.TryCreateLink(provider, sub, userId);
         }
 
         // There is no link to this user yet.
@@ -548,171 +528,10 @@ public class OpenIDConnectController : ControllerBase
         {
             _logger.LogInformation("SSO user link doesn't exist, creating...");
             userId = user.Id;
-            CreateCanonicalLink(provider, userId, sub);
+            _linkManager.TryCreateLink(provider, sub, userId);
         }
 
         return userId;
-    }
-
-    private static Guid GetCanonicalLink(string provider, string sub)
-    {
-        SerializableDictionary<string, Guid> links = GetCanonicalLinks(provider);
-        Guid userId = links[sub];
-        return userId;
-    }
-
-    /// <summary>
-    ///     Create a canonical link for a given user. Must be performed by the user being changed, or admin.
-    /// </summary>
-    /// <param name="provider">The name of the provider to link to a jellyfin account.</param>
-    /// <param name="jellyfinUserId">The user ID within jellyfin to link to the provider.</param>
-    /// <param name="authResponse">The client information to authenticate the user with.</param>
-    /// <returns>Whether this API endpoint succeeded.</returns>
-    [Authorize]
-    [HttpPost("Link/{provider}/{jellyfinUserId}")]
-    [Consumes(MediaTypeNames.Application.Json)]
-    [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult> AddCanonicalLink(
-        [FromRoute] string provider,
-        [FromRoute] Guid jellyfinUserId,
-        [FromBody] AuthResponse authResponse)
-    {
-        if (!await RequestHelpers.AssertCanUpdateUser(_authContext, HttpContext.Request, jellyfinUserId, true)
-                .ConfigureAwait(false))
-        {
-            return StatusCode(StatusCodes.Status403Forbidden, "User is not allowed to link SSO providers.");
-        }
-
-        return Link(provider, jellyfinUserId, authResponse);
-    }
-
-    /// <summary>
-    ///     Unregisters a given mapping from id within provider to user.
-    /// </summary>
-    /// <param name="provider">The name of the provider from which the link should be removed.</param>
-    /// <param name="jellyfinUserId">The user ID within jellyfin to unlink from the provider.</param>
-    /// <param name="sub">The sub of the user in the IdP to unlink.</param>
-    /// <returns>Whether this API endpoint succeeded.</returns>
-    [Authorize]
-    [HttpDelete("Link/{provider}/{jellyfinUserId}/{sub}")]
-    [Consumes(MediaTypeNames.Application.Json)]
-    [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult> DeleteCanonicalLink(
-        [FromRoute] string provider,
-        [FromRoute] Guid jellyfinUserId,
-        [FromRoute] string sub)
-    {
-        if (!await RequestHelpers.AssertCanUpdateUser(_authContext, HttpContext.Request, jellyfinUserId, true)
-                .ConfigureAwait(false))
-        {
-            return StatusCode(StatusCodes.Status403Forbidden,
-                "Current user is not allowed to unlink SSO providers for user ID.");
-        }
-
-        Guid linkedId = GetCanonicalLink(provider, sub);
-
-        if (linkedId != jellyfinUserId)
-        {
-            return Conflict("Jellyfin User ID does not match the user id registered to that IdP sub.");
-        }
-
-        SerializableDictionary<string, Guid> links = GetCanonicalLinks(provider);
-
-        links.Remove(sub);
-
-        return UpdateCanonicalLinkConfig(links, provider);
-    }
-
-    /// <summary>
-    ///     Gets all the canonical links for a user.
-    /// </summary>
-    /// <param name="jellyfinUserId">The user ID within jellyfin for which to return the links.</param>
-    /// <returns>A dictionary of provider : link mappings.</returns>
-    [Authorize]
-    [HttpGet("Links/{jellyfinUserId}")]
-    [Produces(MediaTypeNames.Application.Json)]
-    public async Task<ActionResult<SerializableDictionary<string, IEnumerable<string>>>> GetLinksByUser(
-        Guid jellyfinUserId)
-    {
-        if (!await RequestHelpers.AssertCanUpdateUser(_authContext, HttpContext.Request, jellyfinUserId, true)
-                .ConfigureAwait(false))
-        {
-            return StatusCode(StatusCodes.Status403Forbidden,
-                "Non-admin is not allowed to query other user's mappings.");
-        }
-
-        var mappings = new SerializableDictionary<string, IEnumerable<string>>();
-        SerializableDictionary<string, OidConfig> providerList = OpenIDConnect.Instance.Configuration.OidConfigs;
-
-        foreach (string providerName in providerList.Keys)
-        {
-            SerializableDictionary<string, Guid> canonLinks = providerList[providerName].CanonicalLinks;
-            IEnumerable<string> canonKeys = canonLinks
-                .Where(link => link.Value == jellyfinUserId)
-                .Select(link => link.Key);
-            mappings[providerName] = canonKeys;
-        }
-
-        return mappings;
-    }
-
-    /// <summary>
-    ///     Validate an OIDC link request and create the link if it is valid.
-    /// </summary>
-    /// <param name="provider">The provider to authenticate against.</param>
-    /// <param name="jellyfinUserId">
-    ///     The ID of the account to be linked to the provider.
-    ///     Must be performed by this user, or an admin.
-    /// </param>
-    /// <param name="response">The data passed to the client to ensure it is the right one.</param>
-    /// <returns>JSON for the client to populate information with.</returns>
-    [Consumes(MediaTypeNames.Application.Json)]
-    [Produces(MediaTypeNames.Application.Json)]
-    private ActionResult Link(string provider, Guid jellyfinUserId, AuthResponse response)
-    {
-        if (!OpenIDConnect.Instance.Configuration.OidConfigs.TryGetValue(provider, out _))
-        {
-            return BadRequest("No matching provider found");
-        }
-
-        if (!_stateManager.TryGetValue(response.Data, out TimedAuthorizeState timedState))
-        {
-            return Problem("State not found");
-        }
-
-        if (!_stateManager.IsValid(timedState))
-        {
-            return Problem("State is not valid");
-        }
-
-        _stateManager.TryRemove(response.Data, out _);
-        return CreateCanonicalLink(provider, jellyfinUserId, timedState.Sub);
-    }
-
-    private ActionResult CreateCanonicalLink(string provider, [FromRoute] Guid jellyfinUserId, string sub)
-    {
-        SerializableDictionary<string, Guid> links;
-        try
-        {
-            links = GetCanonicalLinks(provider);
-        }
-        catch (KeyNotFoundException)
-        {
-            return BadRequest("No matching provider found");
-        }
-
-        links[sub] = jellyfinUserId;
-        UpdateCanonicalLinkConfig(links, provider);
-
-        return NoContent();
-    }
-
-    private OkResult UpdateCanonicalLinkConfig(SerializableDictionary<string, Guid> links, string provider)
-    {
-        PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
-        configuration.OidConfigs[provider].CanonicalLinks = links;
-        OpenIDConnect.Instance.UpdateConfiguration(configuration);
-        return Ok();
     }
 
     /// <summary>
@@ -746,6 +565,7 @@ public class OpenIDConnectController : ControllerBase
         // on Jellyfin 10.11 the latter does not save the Permissions table (jellyfin/jellyfin#16298).
         // UpdatePolicyAsync loads the user tracked and uses dbContext.Update(user), persisting the
         // whole entity graph. Seed from the current policy so only the fields we manage change.
+        // ReSharper disable once AssignNullToNotNullAttribute
         UserPolicy policy = _userManager.GetUserDto(user).Policy;
 
         if (enableAuthorization)
@@ -868,6 +688,7 @@ public class OpenIDConnectController : ControllerBase
     }
 }
 
+// ReSharper disable UnusedAutoPropertyAccessor.Global
 /// <summary>
 ///     The data the client should pass back to the API.
 /// </summary>
@@ -898,3 +719,4 @@ public class AuthResponse
     /// </summary>
     public string Data { get; set; }
 }
+// ReSharper restore UnusedAutoPropertyAccessor.Global

@@ -31,8 +31,6 @@ public class PluginConfiguration : BasePluginConfiguration
 [XmlRoot("PluginConfiguration")]
 public class OidConfig
 {
-    private SerializableDictionary<string, Guid> _canonicalLinks;
-
     /// <summary>
     ///     Gets or sets the OpenID well-known information endpoint.
     /// </summary>
@@ -138,11 +136,11 @@ public class OidConfig
     /// <summary>
     ///     Gets or sets a mapping of canonical names from the provider to jellyfin user ids.
     /// </summary>
-    [XmlElement("CanonicalLinks")]
-    public SerializableDictionary<string, Guid> CanonicalLinks
+    [XmlElement("Links")]
+    public SerializableDictionary<string, Guid> Links
     {
-        get => _canonicalLinks ?? new SerializableDictionary<string, Guid>();
-        set => _canonicalLinks = value;
+        get => field ?? new SerializableDictionary<string, Guid>();
+        set;
     }
 
     /// <summary>
