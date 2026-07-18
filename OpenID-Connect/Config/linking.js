@@ -64,22 +64,22 @@ const ssoConfigLinking = {
         }
     },
 
-    populateExistingLinks: (container, provider_name, canonical_names) => {
+    populateExistingLinks: (container, provider_name, subs) => {
         container.querySelectorAll(".sso-provider-link-checkbox-wrapper").forEach((e) => e.remove());
 
-        const checkboxes = canonical_names.map((canonical_name) => {
-            var out = document.createElement("label");
+        const checkboxes = subs.map((sub) => {
+            const out = document.createElement("label");
             out.classList.add("sso-provider-link-checkbox-wrapper");
             out.classList.add("checkbox-wrapper");
             out.innerHTML = `
         <input
           is="emby-checkbox"
           class="sso-link-checkbox"
-          data-id="${canonical_name}"
+          data-sub="${sub}"
           data-provider="${provider_name}"
           type="checkbox"
         />
-        <span class="checkbox-label">${canonical_name}</span>
+        <span class="checkbox-label">${sub}</span>
       `;
             return out;
         });
@@ -97,22 +97,22 @@ const ssoConfigLinking = {
 
         const delete_requests = [...view.querySelectorAll(".sso-link-checkbox")]
             .filter((checkbox_link) => {
-                const canonical_name = checkbox_link.getAttribute("data-id");
+                const sub = checkbox_link.getAttribute("data-sub");
                 const provider_name = checkbox_link.getAttribute("data-provider");
 
-                if (![canonical_name, provider_name].every((e) => e)) {
+                if (![sub, provider_name].every((e) => e)) {
                     return false;
                 }
 
                 return checkbox_link.checked;
             })
             .map((checked_link) => {
-                const canonical_name = checked_link.getAttribute("data-id");
+                const sub = checked_link.getAttribute("data-sub");
                 const provider_name = checked_link.getAttribute("data-provider");
 
                 return ApiClient.fetch({
                     type: "DELETE",
-                    url: ApiClient.getUrl(`OpenIDConnect/Link/${provider_name}/${currentUserId}/${canonical_name}`),
+                    url: ApiClient.getUrl(`OpenIDConnect/Link/${provider_name}/${currentUserId}/${sub}`),
                 });
             });
 

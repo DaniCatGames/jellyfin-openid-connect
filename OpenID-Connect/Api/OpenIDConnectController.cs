@@ -170,12 +170,10 @@ public class OpenIDConnectController : ControllerBase
             }
         }
 
-        Claim usernameClaim = result.User.Claims.FirstOrDefault(claim =>
-            claim.Type == (config.DefaultUsernameClaim?.Trim() ?? "preferred_username"));
-
-        if (usernameClaim != null)
+        Claim subClaim = result.User.Claims.FirstOrDefault(claim => claim.Type == "sub");
+        if (subClaim != null)
         {
-            timedState.Username = usernameClaim.Value;
+            timedState.Sub = subClaim.Value;
             if (config.Roles == null || config.Roles.Length == 0)
             {
                 timedState.Valid = true;
@@ -183,17 +181,13 @@ public class OpenIDConnectController : ControllerBase
         }
         else
         {
-            // Fallback to the sub as a username
-            Claim subClaim = result.User.Claims.FirstOrDefault(claim => claim.Type == "sub");
-            if (subClaim != null)
-            {
-                timedState.Username = subClaim.Value;
-                if (config.Roles == null || config.Roles.Length == 0)
-                {
-                    timedState.Valid = true;
-                }
-            }
+            _logger.LogWarning("OpenID user {Username} does not have a sub claim", timedState.Sub);
+            return Unauthorized("Error. Check IdP or plugin config.");
         }
+
+        Claim usernameClaim = result.User.Claims.FirstOrDefault(claim =>
+            claim.Type == (config.DefaultUsernameClaim?.Trim() ?? "preferred_username"));
+        timedState.Username = usernameClaim != null ? usernameClaim.Value : timedState.Sub;
 
         if (!timedState.Valid)
         {
@@ -455,7 +449,7 @@ public class OpenIDConnectController : ControllerBase
             return Problem("State is not valid.");
         }
 
-        Guid userId = await CreateCanonicalLinkAndUserIfNotExist(provider, timedState.Username);
+        Guid userId = await GetOrCreateUser(provider, timedState.Sub, timedState.Username);
         AuthenticationResult authenticationResult = await AuthenticateUser(
                 userId,
                 timedState.Admin,
@@ -503,22 +497,24 @@ public class OpenIDConnectController : ControllerBase
         return links;
     }
 
-    private async Task<Guid> CreateCanonicalLinkAndUserIfNotExist(string provider, string canonicalName)
+    // TODO: very unsafe, any user that sets their own preferred_username value to that of the jellyfin admin's username could take over the jellyfin admin account 
+    private async Task<Guid> GetOrCreateUser(string provider, string sub, string canonicalName)
     {
-        // First try to get the user by its id in case it was already registered before
+        // Check if there is already a link for this sub
         Guid userId;
         try
         {
-            userId = GetCanonicalLink(provider, canonicalName);
+            userId = GetCanonicalLink(provider, sub);
         }
         catch (KeyNotFoundException)
         {
             userId = Guid.Empty;
         }
 
-        // No userId found? Let's try and find the user by name instead
+        // Get the jellyfin user by userId from link, or IdP username (managed by IdP user!!! unsafe!!!) if there is no link
         User user = userId == Guid.Empty ? _userManager.GetUserByName(canonicalName) : _userManager.GetUserById(userId);
 
+        // There is no jellyfin user at all, so create a new one
         if (user == null)
         {
             _logger.LogInformation($"SSO user {canonicalName} doesn't exist, creating...");
@@ -538,25 +534,30 @@ public class OpenIDConnectController : ControllerBase
             await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
 
             // Make sure there aren't any trailing existing links
+            // TODO
             SerializableDictionary<string, Guid> links = GetCanonicalLinks(provider);
-            links.Remove(canonicalName);
+            links.Remove(sub);
             UpdateCanonicalLinkConfig(links, provider);
+
+            // Link the provider and sub to the new user
+            CreateCanonicalLink(provider, userId, sub);
         }
 
+        // There is no link to this user yet.
         if (userId == Guid.Empty)
         {
             _logger.LogInformation("SSO user link doesn't exist, creating...");
             userId = user.Id;
-            CreateCanonicalLink(provider, userId, canonicalName);
+            CreateCanonicalLink(provider, userId, sub);
         }
 
         return userId;
     }
 
-    private static Guid GetCanonicalLink(string provider, string canonicalName)
+    private static Guid GetCanonicalLink(string provider, string sub)
     {
         SerializableDictionary<string, Guid> links = GetCanonicalLinks(provider);
-        Guid userId = links[canonicalName];
+        Guid userId = links[sub];
         return userId;
     }
 
@@ -590,16 +591,16 @@ public class OpenIDConnectController : ControllerBase
     /// </summary>
     /// <param name="provider">The name of the provider from which the link should be removed.</param>
     /// <param name="jellyfinUserId">The user ID within jellyfin to unlink from the provider.</param>
-    /// <param name="canonicalName">The user ID within jellyfin to unlink.</param>
+    /// <param name="sub">The sub of the user in the IdP to unlink.</param>
     /// <returns>Whether this API endpoint succeeded.</returns>
     [Authorize]
-    [HttpDelete("Link/{provider}/{jellyfinUserId}/{canonicalName}")]
+    [HttpDelete("Link/{provider}/{jellyfinUserId}/{sub}")]
     [Consumes(MediaTypeNames.Application.Json)]
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult> DeleteCanonicalLink(
         [FromRoute] string provider,
         [FromRoute] Guid jellyfinUserId,
-        [FromRoute] string canonicalName)
+        [FromRoute] string sub)
     {
         if (!await RequestHelpers.AssertCanUpdateUser(_authContext, HttpContext.Request, jellyfinUserId, true)
                 .ConfigureAwait(false))
@@ -608,16 +609,16 @@ public class OpenIDConnectController : ControllerBase
                 "Current user is not allowed to unlink SSO providers for user ID.");
         }
 
-        Guid linkedId = GetCanonicalLink(provider, canonicalName);
+        Guid linkedId = GetCanonicalLink(provider, sub);
 
         if (linkedId != jellyfinUserId)
         {
-            return Conflict("Jellyfin User ID does not match the user id registered to that canonical name.");
+            return Conflict("Jellyfin User ID does not match the user id registered to that IdP sub.");
         }
 
         SerializableDictionary<string, Guid> links = GetCanonicalLinks(provider);
 
-        links.Remove(canonicalName);
+        links.Remove(sub);
 
         return UpdateCanonicalLinkConfig(links, provider);
     }
@@ -685,10 +686,10 @@ public class OpenIDConnectController : ControllerBase
         }
 
         _stateManager.TryRemove(response.Data, out _);
-        return CreateCanonicalLink(provider, jellyfinUserId, timedState.Username);
+        return CreateCanonicalLink(provider, jellyfinUserId, timedState.Sub);
     }
 
-    private ActionResult CreateCanonicalLink(string provider, [FromRoute] Guid jellyfinUserId, string providerUserId)
+    private ActionResult CreateCanonicalLink(string provider, [FromRoute] Guid jellyfinUserId, string sub)
     {
         SerializableDictionary<string, Guid> links;
         try
@@ -700,7 +701,7 @@ public class OpenIDConnectController : ControllerBase
             return BadRequest("No matching provider found");
         }
 
-        links[providerUserId] = jellyfinUserId;
+        links[sub] = jellyfinUserId;
         UpdateCanonicalLinkConfig(links, provider);
 
         return NoContent();

@@ -103,6 +103,11 @@ public class TimedAuthorizeState
     public string Username { get; set; }
 
     /// <summary>
+    ///     Gets or sets the sub of the user. This is a unique identifier for the user from the IdP.
+    /// </summary>
+    public string Sub { get; set; }
+
+    /// <summary>
     ///     Gets or sets a value indicating whether the user is an administrator.
     /// </summary>
     public bool Admin { get; set; }
