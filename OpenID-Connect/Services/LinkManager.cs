@@ -43,7 +43,8 @@ public class LinkManager : ILinkManager
         }
 
         links[sub] = userId;
-        return true;
+
+        return TryUpdateLinkConfig(provider, links);
     }
 
     /// <inheritdoc />
