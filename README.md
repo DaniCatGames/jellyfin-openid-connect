@@ -39,6 +39,7 @@ This is 100% alpha software! PRs are welcome to improve the code.
 - [x] Update configuration UI
 - [ ] Update documentation to reflect changes
 - [ ] Add way to test configured provider
+- [ ] Add tests when the code is a bit more stable
 
 ## Tested Providers
 

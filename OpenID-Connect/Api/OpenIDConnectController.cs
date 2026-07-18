@@ -1,5 +1,4 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -13,6 +12,7 @@ using System.Threading.Tasks;
 using Duende.IdentityModel.OidcClient;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Plugin.OpenIDConnect.Config;
+using Jellyfin.Plugin.OpenIDConnect.Services;
 using Jellyfin.Plugin.OpenIDConnect.Views;
 using MediaBrowser.Common.Api;
 using MediaBrowser.Controller.Authentication;
@@ -38,9 +38,6 @@ namespace Jellyfin.Plugin.OpenIDConnect.Api;
 [Route("[controller]")]
 public class OpenIDConnectController : ControllerBase
 {
-    private static readonly ConcurrentDictionary<string, TimedAuthorizeState> StateManager =
-        new ConcurrentDictionary<string, TimedAuthorizeState>();
-
     private readonly IAuthorizationContext _authContext;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<OpenIDConnectController> _logger;
@@ -48,6 +45,7 @@ public class OpenIDConnectController : ControllerBase
     private readonly IProviderManager _providerManager;
     private readonly IServerConfigurationManager _serverConfigurationManager;
     private readonly ISessionManager _sessionManager;
+    private readonly IStateManager _stateManager;
     private readonly IUserManager _userManager;
 
     /// <summary>
@@ -61,6 +59,7 @@ public class OpenIDConnectController : ControllerBase
     /// <param name="providerManager">Instance of the <see cref="IProviderManager" /> interface.</param>
     /// <param name="httpClientFactory">Instance of the <see cref="IHttpClientFactory" /> interface.</param>
     /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager" /> interface.</param>
+    /// <param name="stateManager">Instance of the <see cref="IStateManager" /> interface.</param>
     public OpenIDConnectController(
         ILogger<OpenIDConnectController> logger,
         ILoggerFactory loggerFactory,
@@ -69,7 +68,8 @@ public class OpenIDConnectController : ControllerBase
         IAuthorizationContext authContext,
         IProviderManager providerManager,
         IHttpClientFactory httpClientFactory,
-        IServerConfigurationManager serverConfigurationManager)
+        IServerConfigurationManager serverConfigurationManager,
+        IStateManager stateManager)
     {
         _sessionManager = sessionManager;
         _userManager = userManager;
@@ -79,6 +79,7 @@ public class OpenIDConnectController : ControllerBase
         _providerManager = providerManager;
         _serverConfigurationManager = serverConfigurationManager;
         _httpClientFactory = httpClientFactory;
+        _stateManager = stateManager;
         _logger.LogInformation("OpenID Connect Controller initialized");
     }
 
@@ -106,7 +107,7 @@ public class OpenIDConnectController : ControllerBase
             return BadRequest("Missing state");
         }
 
-        if (!StateManager.TryGetValue(state, out TimedAuthorizeState timedState))
+        if (!_stateManager.TryGetValue(state, out TimedAuthorizeState timedState))
         {
             return BadRequest("Invalid or expired state");
         }
@@ -384,7 +385,7 @@ public class OpenIDConnectController : ControllerBase
     [HttpGet("start/{provider}")]
     public async Task<ActionResult> Challenge(string provider, [FromQuery] bool isLinking = false)
     {
-        Invalidate();
+        _stateManager.Invalidate();
 
         if (!OpenIDConnect.Instance.Configuration.OidConfigs.TryGetValue(provider, out OidConfig config)
             || !config.Enabled)
@@ -410,7 +411,7 @@ public class OpenIDConnectController : ControllerBase
             IsLinking = isLinking,
         };
 
-        StateManager.TryAdd(state.State, timedState);
+        _stateManager.TryAdd(state.State, timedState);
 
         return Redirect(state.StartUrl);
     }
@@ -424,7 +425,7 @@ public class OpenIDConnectController : ControllerBase
     [HttpGet("States")]
     public ActionResult GetRunningFlows()
     {
-        return Ok(StateManager);
+        return Ok(_stateManager.GetStates());
     }
 
     /// <summary>
@@ -444,7 +445,7 @@ public class OpenIDConnectController : ControllerBase
             return BadRequest("Provider does not exist");
         }
 
-        if (!StateManager.TryGetValue(response.Data, out TimedAuthorizeState timedState))
+        if (!_stateManager.TryGetValue(response.Data, out TimedAuthorizeState timedState))
         {
             return Problem("State not found");
         }
@@ -467,7 +468,7 @@ public class OpenIDConnectController : ControllerBase
                 timedState.AvatarURL)
             .ConfigureAwait(false);
 
-        StateManager.TryRemove(response.Data, out _);
+        _stateManager.TryRemove(response.Data, out _);
         return Ok(authenticationResult);
     }
 
@@ -673,18 +674,17 @@ public class OpenIDConnectController : ControllerBase
             return BadRequest("No matching provider found");
         }
 
-        if (!StateManager.TryGetValue(response.Data, out TimedAuthorizeState timedState))
+        if (!_stateManager.TryGetValue(response.Data, out TimedAuthorizeState timedState))
         {
             return Problem("State not found");
         }
 
-        // check if state is still valid
-        if (!timedState.Valid || timedState.Created < DateTime.UtcNow.AddMinutes(-1))
+        if (!_stateManager.IsValid(timedState))
         {
             return Problem("State is not valid");
         }
 
-        StateManager.TryRemove(response.Data, out _);
+        _stateManager.TryRemove(response.Data, out _);
         return CreateCanonicalLink(provider, jellyfinUserId, timedState.Username);
     }
 
@@ -847,16 +847,6 @@ public class OpenIDConnectController : ControllerBase
         return await _sessionManager.AuthenticateDirect(authRequest).ConfigureAwait(false);
     }
 
-    private static void Invalidate()
-    {
-        DateTime cutoff = DateTime.UtcNow.AddMinutes(-1);
-
-        foreach (KeyValuePair<string, TimedAuthorizeState> kvp in StateManager.Where(kvp => kvp.Value.Created < cutoff))
-        {
-            StateManager.TryRemove(kvp);
-        }
-    }
-
     private string GetRequestBase(bool useHttp = false, int? portOverride = null)
     {
         int requestPort = portOverride ?? Request.Host.Port ?? -1;
@@ -906,78 +896,4 @@ public class AuthResponse
     ///     Gets or sets the auth data of the client (for authorizing the response).
     /// </summary>
     public string Data { get; set; }
-}
-
-/// <summary>
-///     A manager for OpenID to manage the state of the clients.
-/// </summary>
-public class TimedAuthorizeState
-{
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="TimedAuthorizeState" /> class.
-    /// </summary>
-    /// <param name="state">The AuthorizeState to time.</param>
-    /// <param name="created">When this state was created.</param>
-    public TimedAuthorizeState(AuthorizeState state, DateTime created)
-    {
-        State = state;
-        Created = created;
-        Valid = false;
-        Admin = false;
-        IsLinking = false;
-        EnableLiveTv = false;
-        EnableLiveTvManagement = false;
-        AvatarURL = null;
-    }
-
-    /// <summary>
-    ///     Gets or sets the Authorization State of the client.
-    /// </summary>
-    public AuthorizeState State { get; set; }
-
-    /// <summary>
-    ///     Gets or sets when this object was created to time it out.
-    /// </summary>
-    public DateTime Created { get; set; }
-
-    /// <summary>
-    ///     Gets or sets a value indicating whether the user is valid.
-    /// </summary>
-    public bool Valid { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the user tied to the state.
-    /// </summary>
-    public string Username { get; set; }
-
-    /// <summary>
-    ///     Gets or sets a value indicating whether the user is an administrator.
-    /// </summary>
-    public bool Admin { get; set; }
-
-    /// <summary>
-    ///     Gets or sets a value indicating whether the state is
-    ///     tied to a linking flow (instead of a login flow).
-    /// </summary>
-    public bool IsLinking { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the folders the user is allowed access to.
-    /// </summary>
-    public List<string> Folders { get; set; }
-
-    /// <summary>
-    ///     Gets or sets a value indicating whether the user is allowed to view live TV.
-    /// </summary>
-    public bool EnableLiveTv { get; set; }
-
-    /// <summary>
-    ///     Gets or sets a value indicating whether the user is allowed to manage live TV.
-    /// </summary>
-    public bool EnableLiveTvManagement { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the user avatar url.
-    /// </summary>
-    public string AvatarURL { get; set; }
 }
