@@ -417,7 +417,6 @@ const oidcConfigurationPage = {
                 Dashboard.processPluginConfigurationUpdateResult(result);
                 oidcConfigurationPage.loadConfiguration(page);
                 oidcConfigurationPage.showDashboard(page);
-                Dashboard.alert(`Provider "${provider_name}" saved.`);
             });
         });
     },
