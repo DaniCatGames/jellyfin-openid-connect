@@ -91,4 +91,18 @@ public class LinkManager : ILinkManager
 
         return mappings;
     }
+
+    /// <inheritdoc />
+    public void DeleteLinksToUser(Guid userId)
+    {
+        SerializableDictionary<string, IEnumerable<string>> links = GetLinksByUser(userId);
+
+        foreach (KeyValuePair<string, IEnumerable<string>> providerMap in links)
+        {
+            foreach (string sub in providerMap.Value)
+            {
+                TryDeleteLink(providerMap.Key, sub);
+            }
+        }
+    }
 }

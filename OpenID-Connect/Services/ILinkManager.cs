@@ -42,7 +42,6 @@ public interface ILinkManager
     /// <returns>Whether it succeeded</returns>
     bool TryUpdateLinkConfig(string provider, SerializableDictionary<string, Guid> links);
 
-
     /// <summary>
     ///     Deletes a link for a provider.
     /// </summary>
@@ -57,4 +56,10 @@ public interface ILinkManager
     /// <param name="userId">The jellyfin user ID</param>
     /// <returns>The map containing all links for the user ID</returns>
     SerializableDictionary<string, IEnumerable<string>> GetLinksByUser(Guid userId);
+
+    /// <summary>
+    ///     Removes all links pointing to a jellyfin user.
+    /// </summary>
+    /// <param name="userId">The id of the usee</param>
+    void DeleteLinksToUser(Guid userId);
 }
