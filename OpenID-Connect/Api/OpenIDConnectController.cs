@@ -106,7 +106,8 @@ public class OpenIDConnectController : ControllerBase
             return BadRequest("Missing state");
         }
 
-        if (!_stateManager.TryGetValue(state, out TimedAuthorizeState timedState) || _stateManager.IsExpired(timedState))
+        if (!_stateManager.TryGetValue(state, out TimedAuthorizeState timedState)
+            || _stateManager.IsExpired(timedState))
         {
             return BadRequest("Invalid or expired state");
         }
@@ -484,7 +485,8 @@ public class OpenIDConnectController : ControllerBase
         user.AuthenticationProviderId = provider;
         await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
 
-        // TODO: remove zombie links?
+        _linkManager.DeleteLinksToUser(user.Id);
+
         return Ok();
     }
 
