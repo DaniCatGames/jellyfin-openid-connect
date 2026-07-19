@@ -15,36 +15,36 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     public PluginConfiguration()
     {
-        OidConfigs = new SerializableDictionary<string, OidConfig>();
+        Configs = new SerializableDictionary<string, Config>();
     }
 
     /// <summary>
-    ///     Gets or sets the OpenID configurations available.
+    ///     Gets or sets the provider configurations available.
     /// </summary>
-    [XmlElement("OidConfigs")]
-    public SerializableDictionary<string, OidConfig> OidConfigs { get; set; }
+    [XmlElement("Configs")]
+    public SerializableDictionary<string, Config> Configs { get; set; }
 }
 
 /// <summary>
 ///     The configuration required for a OpenID flow.
 /// </summary>
 [XmlRoot("PluginConfiguration")]
-public class OidConfig
+public class Config
 {
     /// <summary>
     ///     Gets or sets the OpenID well-known information endpoint.
     /// </summary>
-    public string OidEndpoint { get; set; }
+    public string Endpoint { get; set; }
 
     /// <summary>
     ///     Gets or sets OpenID client ID.
     /// </summary>
-    public string OidClientId { get; set; }
+    public string ClientId { get; set; }
 
     /// <summary>
     ///     Gets or sets OpenID shared secret.
     /// </summary>
-    public string OidSecret { get; set; }
+    public string Secret { get; set; }
 
     /// <summary>
     ///     Gets or sets a value indicating whether the provider is enabled.
@@ -121,7 +121,7 @@ public class OidConfig
     /// <summary>
     ///     Gets or Sets additional Scopes to request access to in the authorization request.
     /// </summary>
-    public string[] OidScopes { get; set; }
+    public string[] Scopes { get; set; }
 
     /// <summary>
     ///     Gets or sets the whether http is used for redirect urls.

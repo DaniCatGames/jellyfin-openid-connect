@@ -56,7 +56,7 @@ public class LinkController : ControllerBase
             return StatusCode(StatusCodes.Status403Forbidden, "User is not allowed to link SSO providers.");
         }
 
-        if (!OpenIDConnect.Instance.Configuration.OidConfigs.TryGetValue(provider, out _))
+        if (!OpenIDConnect.Instance.Configuration.Configs.TryGetValue(provider, out _))
         {
             return BadRequest("No matching provider found");
         }

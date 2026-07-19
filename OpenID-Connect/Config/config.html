@@ -97,9 +97,9 @@
                         <h3 class="sectionTitle">Basic Settings</h3>
                         <div class="collapseContent">
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="OidProviderName">Provider
+                                <label class="inputLabel inputLabelUnfocused" for="ProviderName">Provider
                                     Name</label>
-                                <input class="oidc-text" id="OidProviderName" is="emby-input" required="" type="text"/>
+                                <input class="oidc-text" id="ProviderName" is="emby-input" required="" type="text"/>
                                 <div class="fieldDescription">
                                     Provieder identifier (must be unique), used to identify this provider in API calls
                                     and links.
@@ -107,8 +107,8 @@
                             </div>
 
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="OidEndpoint">OpenID Endpoint</label>
-                                <input class="oidc-text" id="OidEndpoint" is="emby-input"
+                                <label class="inputLabel inputLabelUnfocused" for="Endpoint">OpenID Endpoint</label>
+                                <input class="oidc-text" id="Endpoint" is="emby-input"
                                        placeholder="https://accounts.example.com" required=""
                                        type="text"/>
                                 <div class="fieldDescription">
@@ -117,18 +117,18 @@
                             </div>
 
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="OidClientId">Client ID</label>
-                                <input class="oidc-text" id="OidClientId" is="emby-input" required="" type="text"/>
+                                <label class="inputLabel inputLabelUnfocused" for="ClientId">Client ID</label>
+                                <input class="oidc-text" id="ClientId" is="emby-input" required="" type="text"/>
                                 <div class="fieldDescription">
                                     The OIDC client ID for this Jellyfin instance, configured on the provider side.
                                 </div>
                             </div>
 
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="OidSecret">Client Secret</label>
+                                <label class="inputLabel inputLabelUnfocused" for="Secret">Client Secret</label>
 
                                 <div style="display: flex; align-items: center; gap: 0.5em;">
-                                    <input class="oidc-text" id="OidSecret" is="emby-input" required=""
+                                    <input class="oidc-text" id="Secret" is="emby-input" required=""
                                            style="flex-grow: 1; margin: 0;"
                                            type="password"/>
                                     <button class="emby-button" id="ToggleSecret" is="paper-icon-button-light"
@@ -353,8 +353,8 @@
                         <h3 class="sectionTitle">Advanced Options</h3>
                         <div class="collapseContent">
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="OidScopes">Additional Scopes</label>
-                                <textarea class="oidc-line-list emby-textarea" id="OidScopes" is="emby-textarea"
+                                <label class="inputLabel inputLabelUnfocused" for="Scopes">Additional Scopes</label>
+                                <textarea class="oidc-line-list emby-textarea" id="Scopes" is="emby-textarea"
                                           placeholder="profile&#10;email&#10;groups"></textarea>
                                 <div class="fieldDescription">
                                     One scope per line. Some providers (e.g. Authelia) require additional scopes

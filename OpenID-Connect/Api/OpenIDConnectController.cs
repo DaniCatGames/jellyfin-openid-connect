@@ -11,7 +11,6 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Duende.IdentityModel.OidcClient;
 using Jellyfin.Database.Implementations.Entities;
-using Jellyfin.Plugin.OpenIDConnect.Config;
 using Jellyfin.Plugin.OpenIDConnect.Services;
 using Jellyfin.Plugin.OpenIDConnect.Views;
 using MediaBrowser.Common.Api;
@@ -95,7 +94,7 @@ public class OpenIDConnectController : ControllerBase
         [FromQuery] string state)
     {
         // If the config doesn't have an active provider matching the request, show an error
-        if (!OpenIDConnect.Instance.Configuration.OidConfigs.TryGetValue(provider, out OidConfig config)
+        if (!OpenIDConnect.Instance.Configuration.Configs.TryGetValue(provider, out Config.Config config)
             || !config.Enabled)
         {
             return BadRequest("No matching provider found");
@@ -218,23 +217,23 @@ public class OpenIDConnectController : ControllerBase
             MediaTypeNames.Text.Html);
     }
 
-    private OidcClient CreateClient(string provider, OidConfig config, out ActionResult configError)
+    private OidcClient CreateClient(string provider, Config.Config config, out ActionResult configError)
     {
-        string endpoint = config.OidEndpoint.Trim();
+        string endpoint = config.Endpoint.Trim();
         if (string.IsNullOrEmpty(endpoint))
         {
             configError = BadRequest("No IdP endpoint configured for provider");
             return null;
         }
 
-        string clientId = config.OidClientId.Trim();
+        string clientId = config.ClientId.Trim();
         if (string.IsNullOrEmpty(clientId))
         {
             configError = BadRequest("No client ID configured for provider");
             return null;
         }
 
-        string clientSecret = config.OidSecret.Trim();
+        string clientSecret = config.Secret.Trim();
         if (string.IsNullOrEmpty(clientSecret))
         {
             configError = BadRequest("No client secret configured for provider");
@@ -243,7 +242,7 @@ public class OpenIDConnectController : ControllerBase
 
         configError = null;
 
-        string[] scopes = config.OidScopes ?? new string[2];
+        string[] scopes = config.Scopes ?? new string[2];
         var options = new OidcClientOptions
         {
             Authority = endpoint,
@@ -284,7 +283,7 @@ public class OpenIDConnectController : ControllerBase
     private void ProcessRoles(
         string[] segments,
         Claim claim,
-        OidConfig config,
+        Config.Config config,
         TimedAuthorizeState timedState)
     {
         List<string> roles;
@@ -376,7 +375,7 @@ public class OpenIDConnectController : ControllerBase
     {
         _stateManager.Invalidate();
 
-        if (!OpenIDConnect.Instance.Configuration.OidConfigs.TryGetValue(provider, out OidConfig config)
+        if (!OpenIDConnect.Instance.Configuration.Configs.TryGetValue(provider, out Config.Config config)
             || !config.Enabled)
         {
             throw new ArgumentException("Provider does not exist");
@@ -429,7 +428,7 @@ public class OpenIDConnectController : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult> Authenticate(string provider, [FromBody] AuthResponse response)
     {
-        if (!OpenIDConnect.Instance.Configuration.OidConfigs.TryGetValue(provider, out OidConfig config)
+        if (!OpenIDConnect.Instance.Configuration.Configs.TryGetValue(provider, out Config.Config config)
             || !config.Enabled)
         {
             return BadRequest("Provider does not exist");

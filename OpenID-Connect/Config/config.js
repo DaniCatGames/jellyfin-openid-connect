@@ -15,7 +15,7 @@ const oidcConfigurationPage = {
 
     loadConfiguration: (page) => {
         ApiClient.getPluginConfiguration(oidcConfigurationPage.pluginUniqueId).then((config) => {
-            oidcConfigurationPage.renderProviderList(page, config.OidConfigs || {});
+            oidcConfigurationPage.renderProviderList(page, config.Configs || {});
         });
 
         const folder_container = page.querySelector("#EnabledFolders");
@@ -47,7 +47,7 @@ const oidcConfigurationPage = {
             item.setAttribute("data-provider", name);
 
             const isEnabled = provider.Enabled !== false;
-            const endpoint = provider.OidEndpoint || "";
+            const endpoint = provider.Endpoint || "";
             const iconColor = isEnabled ? "var(--emphasis, #00a4dc)" : "#666";
 
             item.innerHTML = `
@@ -317,10 +317,10 @@ const oidcConfigurationPage = {
 
     loadProvider: (page, provider_name) => {
         ApiClient.getPluginConfiguration(oidcConfigurationPage.pluginUniqueId).then((config) => {
-            const provider = config.OidConfigs[provider_name] || {};
+            const provider = config.Configs[provider_name] || {};
             const form_elements = oidcConfigurationPage.listArgumentsByType(page);
 
-            page.querySelector("#OidProviderName").value = provider_name;
+            page.querySelector("#ProviderName").value = provider_name;
 
             form_elements.text_fields.forEach((id) => {
                 if (provider[id]) page.querySelector("#" + id).value = provider[id];
@@ -357,11 +357,11 @@ const oidcConfigurationPage = {
         }
 
         ApiClient.getPluginConfiguration(oidcConfigurationPage.pluginUniqueId).then((config) => {
-            if (!config.OidConfigs.hasOwnProperty(provider_name)) {
+            if (!config.Configs.hasOwnProperty(provider_name)) {
                 return;
             }
 
-            delete config.OidConfigs[provider_name];
+            delete config.Configs[provider_name];
 
             ApiClient.updatePluginConfiguration(oidcConfigurationPage.pluginUniqueId, config).then((result) => {
                 Dashboard.processPluginConfigurationUpdateResult(result);
@@ -384,8 +384,8 @@ const oidcConfigurationPage = {
 
         ApiClient.getPluginConfiguration(oidcConfigurationPage.pluginUniqueId).then((config) => {
             let current_config = {};
-            if (config.OidConfigs.hasOwnProperty(provider_name)) {
-                current_config = config.OidConfigs[provider_name];
+            if (config.Configs.hasOwnProperty(provider_name)) {
+                current_config = config.Configs[provider_name];
             }
 
             form_elements.text_fields.forEach((id) => {
@@ -411,7 +411,7 @@ const oidcConfigurationPage = {
                 current_config[id] = oidcConfigurationPage.serializeRoleMappings(elem);
             });
 
-            config.OidConfigs[provider_name] = current_config;
+            config.Configs[provider_name] = current_config;
 
             ApiClient.updatePluginConfiguration(oidcConfigurationPage.pluginUniqueId, config).then((result) => {
                 Dashboard.processPluginConfigurationUpdateResult(result);
@@ -452,7 +452,7 @@ export default function (view) {
 
     view.querySelector("#TestProvider").addEventListener("click", (e) => {
         e.preventDefault();
-        const provider_name = view.querySelector("#OidProviderName").value.trim();
+        const provider_name = view.querySelector("#ProviderName").value.trim();
 
         if (!provider_name) return;
 
@@ -473,14 +473,14 @@ export default function (view) {
     });
 
     view.querySelector("#SaveProvider").addEventListener("click", (e) => {
-        const provider_name = view.querySelector("#OidProviderName").value.trim();
+        const provider_name = view.querySelector("#ProviderName").value.trim();
         oidcConfigurationPage.saveProvider(view, provider_name);
         e.preventDefault();
         return false;
     });
 
     view.querySelector("#DeleteProvider").addEventListener("click", (e) => {
-        const provider_name = view.querySelector("#OidProviderName").value.trim();
+        const provider_name = view.querySelector("#ProviderName").value.trim();
         if (provider_name) {
             oidcConfigurationPage.deleteProvider(view, provider_name);
         }
@@ -502,7 +502,7 @@ export default function (view) {
     });
 
     view.querySelector("#ToggleSecret").addEventListener("click", () => {
-        const secretInput = view.querySelector("#OidSecret");
+        const secretInput = view.querySelector("#Secret");
         const icon = view.querySelector("#ToggleSecret .material-icons");
 
         if (secretInput.type === "password") {

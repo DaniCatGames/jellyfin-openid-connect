@@ -20,10 +20,10 @@ public class ProviderController : ControllerBase
     /// <param name="config">The OID configuration (deserialized from a JSON post).</param>
     [Authorize(Policy = Policies.RequiresElevation)]
     [HttpPost("Add/{provider}")]
-    public ActionResult AddProvider(string provider, [FromBody] OidConfig config)
+    public ActionResult AddProvider(string provider, [FromBody] Config.Config config)
     {
         PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
-        configuration.OidConfigs[provider] = config;
+        configuration.Configs[provider] = config;
         OpenIDConnect.Instance.UpdateConfiguration(configuration);
         return Ok();
     }
@@ -37,7 +37,7 @@ public class ProviderController : ControllerBase
     public ActionResult DeleteProvider(string provider)
     {
         PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
-        configuration.OidConfigs.Remove(provider);
+        configuration.Configs.Remove(provider);
         OpenIDConnect.Instance.UpdateConfiguration(configuration);
         return Ok();
     }
@@ -50,7 +50,7 @@ public class ProviderController : ControllerBase
     [HttpGet("Get")]
     public ActionResult GetProviders()
     {
-        return Ok(OpenIDConnect.Instance.Configuration.OidConfigs);
+        return Ok(OpenIDConnect.Instance.Configuration.Configs);
     }
 
     /// <summary>
@@ -60,6 +60,6 @@ public class ProviderController : ControllerBase
     [HttpGet("GetNames")]
     public ActionResult GetProviderNames()
     {
-        return Ok(OpenIDConnect.Instance.Configuration.OidConfigs.Keys);
+        return Ok(OpenIDConnect.Instance.Configuration.Configs.Keys);
     }
 }

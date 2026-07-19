@@ -11,7 +11,7 @@ public class LinkManager : ILinkManager
     /// <inheritdoc />
     public bool TryGetLinks(string provider, out SerializableDictionary<string, Guid> links)
     {
-        if (!OpenIDConnect.Instance.Configuration.OidConfigs.TryGetValue(provider, out OidConfig config))
+        if (!OpenIDConnect.Instance.Configuration.Configs.TryGetValue(provider, out Config.Config config))
         {
             links = new SerializableDictionary<string, Guid>();
             return false;
@@ -51,12 +51,12 @@ public class LinkManager : ILinkManager
     public bool TryUpdateLinkConfig(string provider, SerializableDictionary<string, Guid> links)
     {
         PluginConfiguration config = OpenIDConnect.Instance.Configuration;
-        if (!config.OidConfigs.TryGetValue(provider, out _))
+        if (!config.Configs.TryGetValue(provider, out _))
         {
             return false;
         }
 
-        config.OidConfigs[provider].Links = links;
+        config.Configs[provider].Links = links;
         OpenIDConnect.Instance.UpdateConfiguration(config);
         return true;
     }
@@ -78,7 +78,7 @@ public class LinkManager : ILinkManager
     public SerializableDictionary<string, IEnumerable<string>> GetLinksByUser(Guid userId)
     {
         var mappings = new SerializableDictionary<string, IEnumerable<string>>();
-        SerializableDictionary<string, OidConfig> providerList = OpenIDConnect.Instance.Configuration.OidConfigs;
+        SerializableDictionary<string, Config.Config> providerList = OpenIDConnect.Instance.Configuration.Configs;
 
         foreach (string providerName in providerList.Keys)
         {
