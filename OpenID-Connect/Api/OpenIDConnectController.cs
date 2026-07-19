@@ -106,7 +106,7 @@ public class OpenIDConnectController : ControllerBase
             return BadRequest("Missing state");
         }
 
-        if (!_stateManager.TryGetValue(state, out TimedAuthorizeState timedState))
+        if (!_stateManager.TryGetValue(state, out TimedAuthorizeState timedState) || _stateManager.IsExpired(timedState))
         {
             return BadRequest("Invalid or expired state");
         }
