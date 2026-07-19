@@ -37,7 +37,7 @@ This is 100% alpha software! PRs are welcome to improve the code.
 - [ ] Expose js function to automatically create login page links
 - [ ] Settings for account takeover/creation from IdP
 - [x] Update configuration UI
-- [ ] Update documentation to reflect changes
+- [x] Update documentation to reflect changes
 - [x] Add way to test configured provider
 - [ ] Add tests when the code is a bit more stable
 - [ ] Improve config UX

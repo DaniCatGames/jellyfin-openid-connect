@@ -8,7 +8,7 @@ A `package.json` in the repo root provides the formatting tooling (Prettier). Ru
 
 ## Building
 
-This is built with .NET 9.0. Build with `dotnet publish .` from the plugin project directory. Copy over the `IdentityModel.OidcClient.dll`, the `IdentityModel.dll` and the `openid-connect.dll` files in the `/bin/Debug/net9.0/publish` directory to a new folder in your Jellyfin configuration.
+This is built with .NET 10.0. Build with `dotnet publish .` from the plugin project directory. Copy over the `IdentityModel.OidcClient.dll`, the `IdentityModel.dll` and the `openid-connect.dll` files in the `/bin/Debug/net10.0/publish` directory to a new folder in your Jellyfin configuration.
 
 ### VSCode Workflow
 
@@ -34,4 +34,4 @@ Every change merged to the `main` branch is built and published to the **unstabl
 
 Formal GitHub releases are built and published to the **stable** manifest by CI.
 
-If you wish to use builds from your own fork, refer to [Installing](../README.md#installing), but change the manifest URLs (`.../manifest-stable/manifest.json` and `.../manifest-unstable/manifest.json`) so they refer to your fork.
+If you wish to use builds from your own fork, refer to [Installing](../README.md#installing), but change the manifest URLs (`.../manifest/manifest.json` and `.../manifest-unstable/manifest.json`) so they refer to your fork.

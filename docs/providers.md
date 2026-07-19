@@ -87,11 +87,11 @@ In order to test group membership, we need to request Authelia's `groups` OIDC s
 
 ```yaml
 authelia:
-  OidEndpoint: https://authelia.example.com
-  OidClientId: jellyfin
-  OidSecret: <redacted>
+  Endpoint: https://authelia.example.com
+  ClientId: jellyfin
+  Secret: <redacted>
   RoleClaim: groups
-  OidScopes: ["groups"]
+  Scopes: ["groups"]
   DisablePushedAuthorization: true
 ```
 
@@ -101,47 +101,12 @@ To begin with, we must set up an OIDC provider + application in authentik. Refer
 
 ### authentik's Config
 
-authentik supports RBAC, but is slightly more complicated to configure than Authelia, as we need to configure a custom scope binding to include in the OIDC response.
-
-To do this, we:
-
-- create a **Custom Property Mapping**
-
-  ![image](../img/authentik-config-01.jpg)
-
-- Create a **Scope Mapping**
-
-  ![image](../img/authentik-config-02.jpg)
-
-- Assign the following attributes:
-
-  ![image](../img/authentik-config-03.jpg)
-
-  ```yaml
-  # A nice, human readable name
-  name: Group Membership
-  # The name of the scope a client must request to get access to a user's groups
-  Scope Name: groups
-  # A description of what is being requested to show to a user
-  Description: See Which Groups you belong to
-  ```
-
-- For the **Expression** field, use the following code:
-  ```python
-  return [group.name for group in user.ak_groups.all()]
-  ```
-
-Now we can add this property mapping to authentik's Jellyfin OAuth provider:
-
 - Navigate to `Applications/providers`
 
-  ![image](../img/authentik-config-04.jpg)
+  ![image](../img/authentik-config.jpg)
 
-- Edit / Update your Jellyfin OAuth provider
+- Create / Update your Jellyfin OAuth provider
 - Verify your **"Redirect URIs/Origins (RegEx)"** follows the format: `https://jellyfin.example.com/OpenIDConnect/redirect/Authentik`.
-- Under **"Advanced Protocol Settings"**, add the **Group Membership** Scope
-
-  ![image](../img/authentik-config-05.jpg)
 
 ### Jellyfin's Config
 
@@ -151,11 +116,10 @@ In order to test group membership, we need to request authentik's OIDC scope `gr
 
 ```yaml
 authentik:
-  OidEndpoint: https://authentik.example.com/application/o/jellyfin
-  OidClientId: <same-as-in-authentik>
-  OidSecret: <redacted>
+  Endpoint: https://authentik.example.com/application/o/jellyfin
+  ClientId: <same-as-in-authentik>
+  Secret: <same-as-in-authentik>
   RoleClaim: groups
-  OidScopes: ["groups"]
 ```
 
 If you recieve the error `Error processing request.` from Jellyfin when attempting to login and the Jellyfin logs show `Error loading discovery document: Endpoint belongs to different authority` try setting `Do not validate endpoints` in the plugin settings.
@@ -188,9 +152,9 @@ On Jellyfin's side, we need to configure a Keycloak provider as follows:
 
 ```yaml
 keycloak:
-  OidEndpoint: https://keycloak.example.com/realms/<realm>
-  OidClientId: <same-as-in-keycloak>
-  OidSecret: <redacted>
+  Endpoint: https://keycloak.example.com/realms/<realm>
+  ClientId: <same-as-in-keycloak>
+  Secret: <redacted>
   RoleClaim: <same-as-token-claim-name>
 ```
 
@@ -214,14 +178,9 @@ A simple and easy-to-use OIDC provider that allows users to authenticate with th
 
 ```yaml
 pocketid:
-  OidEndpoint: https://pocketid.example.com/.well-known/openid-configuration
-  OidClientId: <pocket-id-client-id>
-  OidSecret: <pocket-id-secret>
-  EnableAuthorization: true # (optional) If you want Jellyfin to read group permissions from pocket id
-  RoleClaim: groups # (optional) If you want Jellyfin to be able to read group assignments from pocket id
-  AdminRoles: admin # (optional) The pocket id group which will give a user Jellyfin admin privilges
-  Roles: users  # (optional) The pocket id group which will give a user Jellyfin access
-  AvatarUrlFormat: @{picture} # (optional) This will pull each users pocket id photo into Jellyfin
+  Endpoint: https://pocketid.example.com/.well-known/openid-configuration
+  ClientId: <pocket-id-client-id>
+  Secret: <pocket-id-secret>
 ```
 
 ## Kanidm
@@ -252,20 +211,7 @@ Get the secret used in the Jellyfin config with `kanidm system oauth2 show-basic
 
 ```yaml
 kanidm:
-  OidEndpoint: https://idm.example.com/oauth2/openid/jellyfin/
-  OidClientId: jellyfin
-  OidSecret: <kanidm-secret>
-  # (optional) If you want Jellyfin to read group permissions from kanidm
-  EnableAuthorization: true
-  OidScopes:
-    - groups
-  RoleClaim: groups
-  AdminRoles:
-    - jellyfin_admins@idm.example.com
-  Roles:
-    - jellyfin_users@idm.example.com
-    # If in your setup admin accounts aren't members of the users group you need to add the admins group to roles as well
-    - jellyfin_admins@idm.example.com
-  # (optional) If you want the name attribute instead of the spn attribute as username
-  DefaultUsernameClaim: preferred_username
+  Endpoint: https://idm.example.com/oauth2/openid/jellyfin/
+  ClientId: jellyfin
+  Secret: <kanidm-secret>
 ```
