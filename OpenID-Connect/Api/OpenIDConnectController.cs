@@ -127,6 +127,15 @@ public class OpenIDConnectController : ControllerBase
             return BadRequest($"Error logging in: {result.Error} - {result.ErrorDescription}");
         }
 
+        if (timedState.IsTesting)
+        {
+            _stateManager.TryRemove(state, out _);
+
+            string htmlOutput = WebResponse.GenerateHtmlTestingPage(provider, result.User.Claims);
+
+            return Content(htmlOutput, "text/html");
+        }
+
         if (!config.EnableFolderRoles && config.EnabledFolders != null)
         {
             timedState.Folders = new List<string>(config.EnabledFolders);
@@ -289,11 +298,8 @@ public class OpenIDConnectController : ControllerBase
             try
             {
                 JToken currentToken = JToken.Parse(claim.Value);
-                
-                for (int i = 1; i < segments.Length; i++)
-                {
-                    currentToken = currentToken?[segments[i]];
-                }
+
+                for (int i = 1; i < segments.Length; i++) currentToken = currentToken?[segments[i]];
 
                 if (currentToken is JArray rolesArray)
                 {
@@ -333,7 +339,7 @@ public class OpenIDConnectController : ControllerBase
                 IEnumerable<string> folders = config.FolderRoleMapping
                     .Where(map => role.Equals(map.Role.Trim(), StringComparison.Ordinal))
                     .SelectMany(map => map.Folders ?? []);
-                
+
                 timedState.Folders.AddRange(folders);
             }
 
@@ -360,9 +366,13 @@ public class OpenIDConnectController : ControllerBase
     /// </summary>
     /// <param name="provider">The name of the provider.</param>
     /// <param name="isLinking">Whether or not this request is to link accounts (Rather than authenticate).</param>
+    /// <param name="isTesting">Whether or not this request is to test an IdP (Rather than authenticate).</param>
     /// <returns>An asynchronous result for the authentication.</returns>
     [HttpGet("start/{provider}")]
-    public async Task<ActionResult> Challenge(string provider, [FromQuery] bool isLinking = false)
+    public async Task<ActionResult> Challenge(
+        string provider,
+        [FromQuery] bool isLinking = false,
+        [FromQuery] bool isTesting = false)
     {
         _stateManager.Invalidate();
 
@@ -388,6 +398,7 @@ public class OpenIDConnectController : ControllerBase
         var timedState = new TimedAuthorizeState(state, DateTime.UtcNow)
         {
             IsLinking = isLinking,
+            IsTesting = isTesting,
         };
 
         _stateManager.TryAdd(state.State, timedState);

@@ -1,3 +1,5 @@
+let dirty = false;
+
 const oidcConfigurationPage = {
     pluginUniqueId: "3b621017-67a3-461e-a820-21622c591827",
 
@@ -98,6 +100,8 @@ const oidcConfigurationPage = {
     },
 
     clearForm: (page) => {
+        dirty = false;
+
         const form = page.querySelector("#oidc-new-oidc-provider");
 
         form.querySelectorAll(".oidc-text").forEach((input) => {
@@ -374,6 +378,8 @@ const oidcConfigurationPage = {
             return;
         }
 
+        dirty = false;
+
         const form_elements = oidcConfigurationPage.listArgumentsByType(page);
 
         ApiClient.getPluginConfiguration(oidcConfigurationPage.pluginUniqueId).then((config) => {
@@ -429,12 +435,42 @@ export default function (view) {
     oidcConfigurationPage.loadConfiguration(view);
     oidcConfigurationPage.showDashboard(view);
 
+    view.querySelector("#oidc-new-oidc-provider").addEventListener("input", () => {
+        dirty = true;
+    });
+
+    view.querySelector("#oidc-new-oidc-provider").addEventListener("change", () => {
+        dirty = true;
+    });
+
     view.querySelector("#oidc-add-provider").addEventListener("click", () => {
         oidcConfigurationPage.openEditor(view, null);
     });
 
     view.querySelector("#oidc-back-to-dashboard").addEventListener("click", () => {
         oidcConfigurationPage.showDashboard(view);
+    });
+
+    view.querySelector("#TestProvider").addEventListener("click", (e) => {
+        e.preventDefault();
+        const provider_name = view.querySelector("#OidProviderName").value.trim();
+
+        if (!provider_name) return;
+
+        if (dirty) {
+            const confirmSave = window.confirm(
+                "You have unsaved changes. The test will run against the last saved version on the server. Do you want to save your changes now?",
+            );
+            if (confirmSave) {
+                view.querySelector("#SaveProvider").click();
+                Dashboard.alert("Configuration saved. Please click 'Test Connection' again.");
+            }
+
+            return;
+        }
+
+        const testUrl = ApiClient.getUrl(`OpenIDConnect/start/${provider_name}?isTesting=true`);
+        window.open(testUrl, "_blank");
     });
 
     view.querySelector("#SaveProvider").addEventListener("click", (e) => {

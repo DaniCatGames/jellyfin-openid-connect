@@ -119,6 +119,12 @@ public class TimedAuthorizeState
     public bool IsLinking { get; set; }
 
     /// <summary>
+    ///     Gets or sets a value indicating whether the state is
+    ///     tied to a testing flow (instead of a login flow).
+    /// </summary>
+    public bool IsTesting { get; set; }
+
+    /// <summary>
     ///     Gets or sets the folders the user is allowed access to.
     /// </summary>
     public List<string> Folders { get; set; }
