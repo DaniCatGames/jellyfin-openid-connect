@@ -38,8 +38,9 @@ This is 100% alpha software! PRs are welcome to improve the code.
 - [ ] Settings for account takeover/creation from IdP
 - [x] Update configuration UI
 - [ ] Update documentation to reflect changes
-- [ ] Add way to test configured provider
+- [x] Add way to test configured provider
 - [ ] Add tests when the code is a bit more stable
+- [ ] Improve config UX
 
 ## Tested Providers
 
