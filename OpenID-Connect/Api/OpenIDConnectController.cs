@@ -272,70 +272,55 @@ public class OpenIDConnectController : ControllerBase
         return oidcClient;
     }
 
-    private static void ProcessRoles(
+    private void ProcessRoles(
         string[] segments,
         Claim claim,
         OidConfig config,
         TimedAuthorizeState timedState)
     {
         List<string> roles;
-        // If we are not using JSON values, just use the raw info from the claim value
         if (segments.Length == 1)
         {
+            // If we are not using JSON values, just use the raw info from the claim value
             roles = [claim.Value];
         }
         else
         {
-            // We recursively traverse through the JSON data for the roles and parse it
-            var json = JsonConvert.DeserializeObject<IDictionary<string, object>>(claim.Value);
-            if (json is null)
+            try
             {
-                roles = [];
-            }
-            else
-            {
-                bool missingSegment = false;
-                for (int i = 1; i < segments.Length - 1; i++)
+                JToken currentToken = JToken.Parse(claim.Value);
+                
+                for (int i = 1; i < segments.Length; i++)
                 {
-                    string segment = segments[i];
-                    if (!json.TryGetValue(segment, out object nextToken)
-                        || nextToken is not JObject nextObject)
-                    {
-                        missingSegment = true;
-                        break;
-                    }
-
-                    json = nextObject.ToObject<IDictionary<string, object>>();
-                    if (json is null)
-                    {
-                        missingSegment = true;
-                        break;
-                    }
+                    currentToken = currentToken?[segments[i]];
                 }
 
-                if (missingSegment || !json.TryGetValue(segments[^1], out object rolesToken)
-                                   || rolesToken is not JArray rolesArray)
+                if (currentToken is JArray rolesArray)
                 {
-                    roles = [];
+                    roles = rolesArray.ToObject<List<string>>() ?? [];
                 }
                 else
                 {
-                    // The final step is to take the JSON and turn it from a dictionary into a string
-                    roles = rolesArray.ToObject<List<string>>();
+                    throw new JsonException("Role claim is not an array");
                 }
+            }
+            catch (JsonException error)
+            {
+                _logger.LogError(error, "Error parsing JSON role claim: {Claim}", claim.Value);
+                return;
             }
         }
 
         foreach (string role in roles)
         {
             // Check if allowed to login based on roles
-            if (config.Roles?.Contains(role) ?? false)
+            if (config.Roles?.Contains(role) == true)
             {
                 timedState.Valid = true;
             }
 
             // Check if admin based on roles
-            if (config.AdminRoles?.Contains(role) ?? false)
+            if (config.AdminRoles?.Contains(role) == true)
             {
                 timedState.Admin = true;
                 // Also allow login (as the user is an admin)
@@ -345,24 +330,24 @@ public class OpenIDConnectController : ControllerBase
             // Get allowed folders from roles
             if (config.EnableFolderRoles)
             {
-                foreach (FolderRoleMap map in config.FolderRoleMapping.Where(map =>
-                             role.Equals(map.Role.Trim(), StringComparison.Ordinal)))
-                {
-                    timedState.Folders.AddRange(map.Folders);
-                }
+                IEnumerable<string> folders = config.FolderRoleMapping
+                    .Where(map => role.Equals(map.Role.Trim(), StringComparison.Ordinal))
+                    .SelectMany(map => map.Folders ?? []);
+                
+                timedState.Folders.AddRange(folders);
             }
 
             if (config.EnableLiveTvRoles)
             {
                 // Check if allowed Live TV based on roles
-                if (config.LiveTvRoles?.Contains(role) ?? false)
+                if (config.LiveTvRoles?.Contains(role) == true)
                 {
                     timedState.EnableLiveTv = true;
                 }
 
 
                 // Check if allowed Live TV management based on roles
-                if (config.LiveTvManagementRoles?.Contains(role) ?? false)
+                if (config.LiveTvManagementRoles?.Contains(role) == true)
                 {
                     timedState.EnableLiveTvManagement = true;
                 }
