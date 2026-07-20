@@ -9,6 +9,14 @@
         "imageUrl": "https://raw.githubusercontent.com/DaniCatGames/jellyfin-openid-connect/main/img/logo.png",
         "versions": [
             {
+                "version": "1.2607.41.0",
+                "changelog": "- Unstable release",
+                "targetAbi": "12.0.0.0",
+                "sourceUrl": "https://github.com/DaniCatGames/jellyfin-openid-connect/releases/download/unstable/openid-connect_1.2607.41.0.zip",
+                "checksum": "231279c2de25f60bdbc20743b426c3c6",
+                "timestamp": "2026-07-20T12:02:02Z"
+            },
+            {
                 "version": "1.2607.40.0",
                 "changelog": "- Unstable release",
                 "targetAbi": "12.0.0.0",
