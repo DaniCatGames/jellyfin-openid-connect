@@ -33,7 +33,7 @@ This is 100% alpha software! PRs are welcome to improve the code.
 ## Roadmap
 - [x] Fix account linking
 - [ ] RP Initiated Logout for browser sessions
-- [ ] Use 'picture' claim for avatar syncing
+- [x] Use 'picture' claim for avatar syncing
 - [ ] Expose js function to automatically create login page links
 - [x] Toggle user provisioning
 - [x] Allow auto-linking only for selected users
