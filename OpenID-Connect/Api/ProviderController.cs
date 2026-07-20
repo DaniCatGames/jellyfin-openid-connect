@@ -1,4 +1,3 @@
-using Jellyfin.Plugin.OpenIDConnect.Config;
 using MediaBrowser.Common.Api;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -20,7 +19,7 @@ public class ProviderController : ControllerBase
     /// <param name="config">The OID configuration (deserialized from a JSON post).</param>
     [Authorize(Policy = Policies.RequiresElevation)]
     [HttpPost("Add/{provider}")]
-    public ActionResult AddProvider(string provider, [FromBody] Config.Config config)
+    public ActionResult AddProvider(string provider, [FromBody] Config config)
     {
         PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
         configuration.Configs[provider] = config;

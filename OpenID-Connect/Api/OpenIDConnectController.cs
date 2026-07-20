@@ -94,7 +94,7 @@ public class OpenIDConnectController : ControllerBase
         [FromQuery] string state)
     {
         // If the config doesn't have an active provider matching the request, show an error
-        if (!OpenIDConnect.Instance.Configuration.Configs.TryGetValue(provider, out Config.Config config)
+        if (!OpenIDConnect.Instance.Configuration.Configs.TryGetValue(provider, out Config config)
             || !config.Enabled)
         {
             return BadRequest("No matching provider found");
@@ -217,7 +217,7 @@ public class OpenIDConnectController : ControllerBase
             MediaTypeNames.Text.Html);
     }
 
-    private OidcClient CreateClient(string provider, Config.Config config, out ActionResult configError)
+    private OidcClient CreateClient(string provider, Config config, out ActionResult configError)
     {
         string endpoint = config.Endpoint.Trim();
         if (string.IsNullOrEmpty(endpoint))
@@ -283,7 +283,7 @@ public class OpenIDConnectController : ControllerBase
     private void ProcessRoles(
         string[] segments,
         Claim claim,
-        Config.Config config,
+        Config config,
         TimedAuthorizeState timedState)
     {
         List<string> roles;
@@ -375,7 +375,7 @@ public class OpenIDConnectController : ControllerBase
     {
         _stateManager.Invalidate();
 
-        if (!OpenIDConnect.Instance.Configuration.Configs.TryGetValue(provider, out Config.Config config)
+        if (!OpenIDConnect.Instance.Configuration.Configs.TryGetValue(provider, out Config config)
             || !config.Enabled)
         {
             throw new ArgumentException("Provider does not exist");
@@ -428,7 +428,7 @@ public class OpenIDConnectController : ControllerBase
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult> Authenticate(string provider, [FromBody] AuthResponse response)
     {
-        if (!OpenIDConnect.Instance.Configuration.Configs.TryGetValue(provider, out Config.Config config)
+        if (!OpenIDConnect.Instance.Configuration.Configs.TryGetValue(provider, out Config config)
             || !config.Enabled)
         {
             return BadRequest("Provider does not exist");
@@ -444,7 +444,16 @@ public class OpenIDConnectController : ControllerBase
             return Problem("State is not valid.");
         }
 
-        Guid userId = await GetOrCreateUser(provider, timedState.Sub, timedState.Username);
+        Guid userId = await GetOrCreateUser(provider, timedState.Sub, timedState.Username, config);
+
+        if (userId == Guid.Empty)
+        {
+            _stateManager.TryRemove(response.Data, out _);
+            _logger.LogWarning("User {Username} does not exist and user provisioning is disabled.",
+                timedState.Username);
+            return Unauthorized("User provisioning is disabled.");
+        }
+
         AuthenticationResult authenticationResult = await AuthenticateUser(
                 userId,
                 timedState.Admin,
@@ -486,49 +495,59 @@ public class OpenIDConnectController : ControllerBase
     }
 
     // TODO: very unsafe, any user that sets their own preferred_username value to that of the jellyfin admin's username could take over the jellyfin admin account 
-    private async Task<Guid> GetOrCreateUser(string provider, string sub, string canonicalName)
+    private async Task<Guid> GetOrCreateUser(string provider, string sub, string username, Config config)
     {
         // Check if there is already a link for this sub, else get empty id
         _linkManager.TryGetLink(provider, sub, out Guid userId);
 
         // Get the jellyfin user by userId from link, or IdP username (managed by IdP user!!! unsafe!!!) if there is no link
-        User user = userId == Guid.Empty ? _userManager.GetUserByName(canonicalName) : _userManager.GetUserById(userId);
+        User user = userId == Guid.Empty ? _userManager.GetUserByName(username) : _userManager.GetUserById(userId);
 
         // There is no jellyfin user at all, so create a new one
         if (user == null)
         {
-            _logger.LogInformation($"SSO user {canonicalName} doesn't exist, creating...");
-            user = await _userManager.CreateUserAsync(canonicalName).ConfigureAwait(false);
+            if (!config.EnableUserProvisioning)
+            {
+                return Guid.Empty;
+            }
 
-            userId = user.Id;
-
-            // PATCH: Strip default Jellyfin permissions exactly once on creation
-            // Either permissions will be overwritten by provider, or this will let them default to none
-            // like the text says it does.
-            UserPolicy policy = _userManager.GetUserDto(user).Policy;
-            policy.EnableAllFolders = false;
-            policy.EnabledFolders = [];
-            await _userManager.UpdatePolicyAsync(user.Id, policy).ConfigureAwait(false);
-
-            user.AuthenticationProviderId = "Jellyfin.Plugin.OpenIDConnect.AuthProvider";
-            await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
-
-            // Make sure there aren't any trailing existing links, can happen if a user was deleted but the link wasn't
-            _linkManager.TryDeleteLink(provider, sub);
-
-            // Link the provider and sub to the new user
-            _linkManager.TryCreateLink(provider, sub, userId);
+            user = await CreateUserAndLink(provider, sub, username);
+            return user.Id;
         }
 
         // There is no link to this user yet.
         if (userId == Guid.Empty)
         {
-            _logger.LogInformation("SSO user link doesn't exist, creating...");
+            _logger.LogInformation(
+                "OIDC user link doesn't exist, creating new link between sub {sub} and jellyfin user {username}.",
+                sub,
+                username);
             userId = user.Id;
             _linkManager.TryCreateLink(provider, sub, userId);
         }
 
         return userId;
+    }
+
+    private async Task<User> CreateUserAndLink(string provider, string sub, string username)
+    {
+        _logger.LogInformation("OIDC user {Username} doesn't exist, creating...", username);
+        User user = await _userManager.CreateUserAsync(username).ConfigureAwait(false);
+
+        // PATCH: Strip default Jellyfin permissions exactly once on creation
+        // Either permissions will be overwritten by provider, or this will let them default to none
+        // like the text says it does.
+        UserPolicy policy = _userManager.GetUserDto(user).Policy;
+        policy.EnableAllFolders = false;
+        policy.EnabledFolders = [];
+        await _userManager.UpdatePolicyAsync(user.Id, policy).ConfigureAwait(false);
+
+        user.AuthenticationProviderId = "Jellyfin.Plugin.OpenIDConnect.AuthProvider";
+        await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
+
+        // Link the provider and sub to the new user
+        _linkManager.TryCreateLink(provider, sub, user.Id);
+        return user;
     }
 
     /// <summary>

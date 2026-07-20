@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using Jellyfin.Plugin.OpenIDConnect.Config;
 
 namespace Jellyfin.Plugin.OpenIDConnect.Services;
 
@@ -11,7 +10,7 @@ public class LinkManager : ILinkManager
     /// <inheritdoc />
     public bool TryGetLinks(string provider, out SerializableDictionary<string, Guid> links)
     {
-        if (!OpenIDConnect.Instance.Configuration.Configs.TryGetValue(provider, out Config.Config config))
+        if (!OpenIDConnect.Instance.Configuration.Configs.TryGetValue(provider, out Config config))
         {
             links = new SerializableDictionary<string, Guid>();
             return false;
@@ -78,7 +77,7 @@ public class LinkManager : ILinkManager
     public SerializableDictionary<string, IEnumerable<string>> GetLinksByUser(Guid userId)
     {
         var mappings = new SerializableDictionary<string, IEnumerable<string>>();
-        SerializableDictionary<string, Config.Config> providerList = OpenIDConnect.Instance.Configuration.Configs;
+        SerializableDictionary<string, Config> providerList = OpenIDConnect.Instance.Configuration.Configs;
 
         foreach (string providerName in providerList.Keys)
         {

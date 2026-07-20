@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using System.Xml.Serialization;
 using MediaBrowser.Model.Plugins;
 
-namespace Jellyfin.Plugin.OpenIDConnect.Config;
+namespace Jellyfin.Plugin.OpenIDConnect;
 
 /// <summary>
 ///     Plugin Configuration.
@@ -50,6 +50,11 @@ public class Config
     ///     Gets or sets a value indicating whether the provider is enabled.
     /// </summary>
     public bool Enabled { get; set; }
+
+    /// <summary>
+    ///     Gets or sets a value indicating whether the IdP will autoprovision users.
+    /// </summary>
+    public bool EnableUserProvisioning { get; set; }
 
     /// <summary>
     ///     Gets or sets a value indicating whether RBAC is enabled.

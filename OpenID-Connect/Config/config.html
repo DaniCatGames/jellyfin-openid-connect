@@ -231,6 +231,18 @@
                                     Leave blank to not auto-grant admin.
                                 </div>
                             </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input class="oidc-toggle" id="EnableUserProvisioning" is="emby-checkbox"
+                                           name="EnableUserProvisioning" type="checkbox"/>
+                                    <span>Auto Provision Users</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    When enabled, users will be automatically created upon first login if they have no
+                                    matching link in <!--TODO: autolinking allowlist reference-->
+                                </div>
+                            </div>
                         </div>
                     </div>
 
