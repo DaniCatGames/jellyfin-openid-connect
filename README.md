@@ -36,7 +36,7 @@ This is 100% alpha software! PRs are welcome to improve the code.
 - [ ] Use 'picture' claim for avatar syncing
 - [ ] Expose js function to automatically create login page links
 - [x] Toggle user provisioning
-- [ ] Allow auto-linking only for selected users
+- [x] Allow auto-linking only for selected users
 - [x] Update configuration UI
 - [x] Update documentation to reflect changes
 - [x] Add way to test configured provider

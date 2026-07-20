@@ -243,6 +243,21 @@
                                     matching link in <!--TODO: autolinking allowlist reference-->
                                 </div>
                             </div>
+
+                            <div class="inputContainer" id="Container-AutoLinkingAllowList">
+                                <label class="inputLabel inputLabelUnfocused">Auto-Linking Allowlist</label>
+                                <div class="checkboxList paperList checkboxList-paperList oidc-bordered-list"
+                                     id="AutoLinkingAllowList" style="max-height: 250px; overflow-y: auto;"></div>
+                                <div class="fieldDescription">
+                                    Select existing local users that should be automatically linked the first time they
+                                    log in via this provider. Any user with the same username in the IdP as a user in
+                                    this list will be automatically linked to that user. If users are able to customize
+                                    their own names in the IdP, ensure that you trust them, users with the same IdP name
+                                    as the jellyfin administrator account name can take control over the jellyfin
+                                    account.
+                                    Once successfully linked, the user is automatically removed from this list.
+                                </div>
+                            </div>
                         </div>
                     </div>
 

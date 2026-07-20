@@ -449,9 +449,7 @@ public class OpenIDConnectController : ControllerBase
         if (userId == Guid.Empty)
         {
             _stateManager.TryRemove(response.Data, out _);
-            _logger.LogWarning("User {Username} does not exist and user provisioning is disabled.",
-                timedState.Username);
-            return Unauthorized("User provisioning is disabled.");
+            return Unauthorized("User provisioning or linking with this user is disabled.");
         }
 
         AuthenticationResult authenticationResult = await AuthenticateUser(
@@ -494,44 +492,74 @@ public class OpenIDConnectController : ControllerBase
         return Ok();
     }
 
-    // TODO: very unsafe, any user that sets their own preferred_username value to that of the jellyfin admin's username could take over the jellyfin admin account 
     private async Task<Guid> GetOrCreateUser(string provider, string sub, string username, Config config)
     {
         // Check if there is already a link for this sub, else get empty id
-        _linkManager.TryGetLink(provider, sub, out Guid userId);
+        bool linkExists = _linkManager.TryGetLink(provider, sub, out Guid userId);
+        User user;
 
-        // Get the jellyfin user by userId from link, or IdP username (managed by IdP user!!! unsafe!!!) if there is no link
-        User user = userId == Guid.Empty ? _userManager.GetUserByName(username) : _userManager.GetUserById(userId);
-
-        // There is no jellyfin user at all, so create a new one
-        if (user == null)
+        if (linkExists)
         {
-            if (!config.EnableUserProvisioning)
+            user = _userManager.GetUserById(userId);
+            if (user != null)
             {
-                return Guid.Empty;
+                _logger.LogInformation("Found link to jellyfin user {username} from sub {sub} on IdP {provider}.",
+                    user.Username,
+                    sub,
+                    provider);
+                return user.Id;
             }
 
-            user = await CreateUserAndLink(provider, sub, username);
-            return user.Id;
+            _logger.LogWarning(
+                "OIDC user link exists between sub {sub} and jellyfin userId {userid}, but jellyfin user doesn't exist.",
+                sub,
+                userId);
+            return Guid.Empty;
         }
 
         // There is no link to this user yet.
-        if (userId == Guid.Empty)
+        // Try to get user by username
+        user = _userManager.GetUserByName(username);
+
+        if (user != null)
         {
+            // If a user is found with the same username, check if they can be linked, else stop and dont continue
+            if (config.AutoLinkingAllowList == null
+                || !config.AutoLinkingAllowList.Contains(username, StringComparer.OrdinalIgnoreCase))
+            {
+                _logger.LogWarning(
+                    "OIDC user {Username} already exists, but is not in the linking allowlist. Not linking user.",
+                    username);
+                return Guid.Empty;
+            }
+
+            config.AutoLinkingAllowList = config.AutoLinkingAllowList
+                .Where(u => !u.Equals(username, StringComparison.OrdinalIgnoreCase))
+                .ToArray();
+            OpenIDConnect.Instance.UpdateConfiguration(OpenIDConnect.Instance.Configuration);
+
             _logger.LogInformation(
                 "OIDC user link doesn't exist, creating new link between sub {sub} and jellyfin user {username}.",
                 sub,
                 username);
-            userId = user.Id;
-            _linkManager.TryCreateLink(provider, sub, userId);
+            _linkManager.TryCreateLink(provider, sub, user.Id);
+            return user.Id;
         }
 
-        return userId;
+
+        // There is no jellyfin user with the same username at all, so create a new one, if provisioning is enabled
+        if (!config.EnableUserProvisioning)
+        {
+            return Guid.Empty;
+        }
+
+        _logger.LogInformation("OIDC user {Username} doesn't exist, creating...", username);
+        user = await CreateUserAndLink(provider, sub, username);
+        return user.Id;
     }
 
     private async Task<User> CreateUserAndLink(string provider, string sub, string username)
     {
-        _logger.LogInformation("OIDC user {Username} doesn't exist, creating...", username);
         User user = await _userManager.CreateUserAsync(username).ConfigureAwait(false);
 
         // PATCH: Strip default Jellyfin permissions exactly once on creation

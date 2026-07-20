@@ -20,6 +20,9 @@ const oidcConfigurationPage = {
 
         const folder_container = page.querySelector("#EnabledFolders");
         oidcConfigurationPage.populateFolders(folder_container);
+
+        const user_container = page.querySelector("#AutoLinkingAllowList");
+        oidcConfigurationPage.populateUsers(user_container);
     },
 
     renderProviderList: (page, providers) => {
@@ -123,6 +126,11 @@ const oidcConfigurationPage = {
 
         const roleContainer = page.querySelector("#FolderRoleMapping");
         roleContainer.querySelectorAll(".oidc-role-mapping-container").forEach((e) => e.remove());
+
+        const userContainer = page.querySelector("#AutoLinkingAllowList");
+        userContainer.querySelectorAll(".user-checkbox").forEach((cb) => {
+            cb.checked = false;
+        });
 
         oidcConfigurationPage.updateLibraryAccessVisibility(page);
         oidcConfigurationPage.updateLiveTvVisibility(page);
@@ -345,6 +353,12 @@ const oidcConfigurationPage = {
                 if (provider[id]) oidcConfigurationPage.populateRoleMappings(provider[id], elem);
             });
 
+            const userContainer = page.querySelector("#AutoLinkingAllowList");
+            userContainer.querySelectorAll(".user-checkbox").forEach((cb) => {
+                const username = cb.getAttribute("data-username");
+                cb.checked = provider.AutoLinkingAllowList && provider.AutoLinkingAllowList.includes(username);
+            });
+
             oidcConfigurationPage.updateLiveTvVisibility(page);
             oidcConfigurationPage.updateLibraryAccessVisibility(page);
             oidcConfigurationPage.updateUserAccessVisibility(page);
@@ -411,6 +425,11 @@ const oidcConfigurationPage = {
                 current_config[id] = oidcConfigurationPage.serializeRoleMappings(elem);
             });
 
+            const userContainer = page.querySelector("#AutoLinkingAllowList");
+            current_config.AutoLinkingAllowList = [...userContainer.querySelectorAll(".user-checkbox")]
+                .filter((cb) => cb.checked)
+                .map((cb) => cb.getAttribute("data-username"));
+
             config.Configs[provider_name] = current_config;
 
             ApiClient.updatePluginConfiguration(oidcConfigurationPage.pluginUniqueId, config).then((result) => {
@@ -426,6 +445,20 @@ const oidcConfigurationPage = {
         style.rel = "stylesheet";
         style.href = ApiClient.getUrl("web/configurationpage") + "?name=openid-connect.css";
         view.appendChild(style);
+    },
+
+    populateUsers: (container) => {
+        return ApiClient.getUsers().then((users) => {
+            container.innerHTML = "";
+            users.forEach((user) => {
+                const label = document.createElement("label");
+                label.innerHTML = `
+                <input is="emby-checkbox" class="user-checkbox" data-username="${user.Name}" type="checkbox" />
+                <span>${user.Name}</span>
+            `;
+                container.appendChild(label);
+            });
+        });
     },
 };
 

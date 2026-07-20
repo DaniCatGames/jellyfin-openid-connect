@@ -57,6 +57,11 @@ public class Config
     public bool EnableUserProvisioning { get; set; }
 
     /// <summary>
+    ///     Gets or sets the list of users that IdP users can be linked to.
+    /// </summary>
+    public string[] AutoLinkingAllowList { get; set; }
+
+    /// <summary>
     ///     Gets or sets a value indicating whether RBAC is enabled.
     /// </summary>
     public bool EnableAuthorization { get; set; }
