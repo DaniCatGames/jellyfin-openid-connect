@@ -183,13 +183,13 @@
                             </div>
 
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="AvatarUrlFormat">Avatar URL
-                                    Template</label>
-                                <input class="oidc-text" id="AvatarUrlFormat" is="emby-input"
-                                       placeholder="https://example.com/@{user_id}.png"
+                                <label class="inputLabel inputLabelUnfocused" for="AvatarClaim">Avatar Claim</label>
+                                <input class="oidc-text" id="AvatarClaim" is="emby-input"
+                                       placeholder="picture"
                                        type="text"/>
                                 <div class="fieldDescription">
-                                    URL template for user avatars. Use <code>{user_id}</code> as a placeholder.
+                                    The claim containing the URL for the user's profile picture. Defaults to
+                                    <code>picture</code>.
                                 </div>
                             </div>
                         </div>

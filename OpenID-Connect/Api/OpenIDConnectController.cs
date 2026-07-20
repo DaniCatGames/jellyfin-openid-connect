@@ -147,11 +147,14 @@ public class OpenIDConnectController : ControllerBase
         timedState.EnableLiveTv = config.EnableLiveTv;
         timedState.EnableLiveTvManagement = config.EnableLiveTvManagement;
 
-        if (config.AvatarUrlFormat is not null)
+        Claim avatarClaim = result.User.Claims.FirstOrDefault(claim =>
+            claim.Type == (string.IsNullOrWhiteSpace(config.AvatarClaim) ? "picture" : config.AvatarClaim));
+
+        if (avatarClaim != null
+            && Uri.TryCreate(avatarClaim.Value, UriKind.Absolute, out Uri uri)
+            && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps))
         {
-            timedState.AvatarURL = result.User.Claims.Aggregate(
-                config.AvatarUrlFormat,
-                (s, claim) => s.Contains($"@{{{claim.Type}}}") ? s.Replace($"@{{{claim.Type}}}", claim.Value) : s);
+            timedState.AvatarURL = uri.ToString();
         }
 
         foreach (Claim claim in result.User.Claims)
@@ -658,19 +661,33 @@ public class OpenIDConnectController : ControllerBase
 
                 HttpResponseMessage avatarResponse = await client.GetAsync(avatarUrl);
 
+                if (!avatarResponse.IsSuccessStatusCode)
+                {
+                    throw new Exception("Cannot get avatar image: " + avatarUrl);
+                }
+
                 if (!avatarResponse.Content.Headers.TryGetValues("content-type",
                         out IEnumerable<string> contentTypeList))
                 {
                     throw new Exception("Cannot get Content-Type of image : " + avatarUrl);
                 }
 
-                string contentType = contentTypeList.First();
-                if (!contentType.StartsWith("image"))
+                string contentType = contentTypeList.First().ToLowerInvariant();
+                string extension = contentType switch
                 {
-                    throw new Exception("Content type of avatar URL is not an image, got :  " + contentType);
-                }
+                    "image/jpeg" or "image/jpg" => ".jpg",
+                    "image/png" => ".png",
+                    "image/gif" => ".gif",
+                    "image/webp" => ".webp",
+                    "image/avif" => ".avif",
+                    "image/apng" => ".apng",
+                    "image/bmp" => ".bmp",
+                    "image/heic" => ".heic",
+                    "image/heif" => ".heif",
+                    "image/jxl" => ".jxl",
+                    _ => throw new Exception("Content type of avatar URL is not an image, got :  " + contentType),
+                };
 
-                string extension = contentType.Split("/").Last();
                 Stream stream = await avatarResponse.Content.ReadAsStreamAsync();
 
                 if (user != null)

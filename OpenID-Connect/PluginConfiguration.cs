@@ -159,9 +159,9 @@ public class Config
     public string DefaultUsernameClaim { get; set; }
 
     /// <summary>
-    ///     Gets or sets the URL format of the new user avatar.
+    ///     Gets or sets the claim containing the profile picture for the user.
     /// </summary>
-    public string AvatarUrlFormat { get; set; }
+    public string AvatarClaim { get; set; }
 
     /// <summary>
     ///     Gets or sets a value indicating whether HTTPS in the discovery endpoint is required.
