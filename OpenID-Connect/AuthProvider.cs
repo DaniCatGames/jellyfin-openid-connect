@@ -15,8 +15,6 @@ public class AuthProvider : IAuthenticationProvider
     /// </summary>
     /// <param name="username"></param>
     /// <param name="password"></param>
-    /// <returns></returns>
-    /// <exception cref="NotImplementedException"></exception>
     public Task<ProviderAuthenticationResult> Authenticate(string username, string password)
     {
         throw new AuthenticationException("OIDC is enabled for this user.");
@@ -27,11 +25,9 @@ public class AuthProvider : IAuthenticationProvider
     /// </summary>
     /// <param name="user"></param>
     /// <param name="newPassword"></param>
-    /// <returns></returns>
-    /// <exception cref="NotImplementedException"></exception>
     public Task ChangePassword(User user, string newPassword)
     {
-        throw new NotImplementedException("OIDC is enabled for this user.");
+        throw new Exception("OIDC is enabled for this user.");
     }
 
     /// <summary>

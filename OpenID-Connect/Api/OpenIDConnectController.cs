@@ -10,7 +10,9 @@ using System.Security.Claims;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Duende.IdentityModel.OidcClient;
+using Jellyfin.Data;
 using Jellyfin.Database.Implementations.Entities;
+using Jellyfin.Database.Implementations.Enums;
 using Jellyfin.Plugin.OpenIDConnect.Services;
 using Jellyfin.Plugin.OpenIDConnect.Views;
 using MediaBrowser.Common.Api;
@@ -19,7 +21,6 @@ using MediaBrowser.Controller.Configuration;
 using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Controller.Session;
-using MediaBrowser.Model.Users;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
@@ -565,18 +566,12 @@ public class OpenIDConnectController : ControllerBase
     {
         User user = await _userManager.CreateUserAsync(username).ConfigureAwait(false);
 
-        // PATCH: Strip default Jellyfin permissions exactly once on creation
-        // Either permissions will be overwritten by provider, or this will let them default to none
-        // like the text says it does.
-        UserPolicy policy = _userManager.GetUserDto(user).Policy;
-        policy.EnableAllFolders = false;
-        policy.EnabledFolders = [];
-        await _userManager.UpdatePolicyAsync(user.Id, policy).ConfigureAwait(false);
+        user.SetPermission(PermissionKind.EnableAllFolders, false);
+        user.SetPreference(PreferenceKind.EnabledFolders, []);
 
         user.AuthenticationProviderId = "Jellyfin.Plugin.OpenIDConnect.AuthProvider";
         await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
 
-        // Link the provider and sub to the new user
         _linkManager.TryCreateLink(provider, sub, user.Id);
         return user;
     }
@@ -606,22 +601,20 @@ public class OpenIDConnectController : ControllerBase
     {
         User user = _userManager.GetUserById(userId);
 
-        // TODO: should have been fixed in https://github.com/jellyfin/jellyfin/pull/16944
-
-        // Persist permissions via UpdatePolicyAsync rather than SetPermission + UpdateUserAsync:
-        // on Jellyfin 10.11 the latter does not save the Permissions table (jellyfin/jellyfin#16298).
-        // UpdatePolicyAsync loads the user tracked and uses dbContext.Update(user), persisting the
-        // whole entity graph. Seed from the current policy so only the fields we manage change.
-        // ReSharper disable once AssignNullToNotNullAttribute
-        UserPolicy policy = _userManager.GetUserDto(user).Policy;
+        if (user == null)
+        {
+            throw new Exception("User not found");
+        }
 
         if (enableAuthorization)
         {
-            policy.IsAdministrator = isAdmin;
-            policy.EnableAllFolders = enableAllFolders;
+            user.SetPermission(PermissionKind.IsAdministrator, isAdmin);
+            user.SetPermission(PermissionKind.EnableAllFolders, enableAllFolders);
+
             if (!enableAllFolders)
             {
-                // Folder IDs arrive as strings; UserPolicy needs Guids. Parse once, dropping any unparseable entries.
+                // Folder IDs arrive as strings; EnabledFolders preference needs Guids. Parse once, dropping any
+                // unparseable entries.
                 var folderGuids = new List<Guid>(enabledFolders.Length);
                 foreach (string folderId in enabledFolders)
                 {
@@ -631,86 +624,16 @@ public class OpenIDConnectController : ControllerBase
                     }
                 }
 
-                policy.EnabledFolders = folderGuids.ToArray();
+                user.SetPreference(PreferenceKind.EnabledFolders, folderGuids.ToArray());
             }
         }
 
-        policy.EnableLiveTvAccess = enableLiveTv;
-        policy.EnableLiveTvManagement = enableLiveTvAdmin;
-
-        await _userManager.UpdatePolicyAsync(userId, policy).ConfigureAwait(false);
-
-        // UpdatePolicyAsync saved through its own DbContext, so the `user` handle loaded above is
-        // now stale (its row-version no longer matches). Re-fetch before any further UpdateUserAsync,
-        // otherwise the next save throws DbUpdateConcurrencyException ("0 rows affected").
-        user = _userManager.GetUserById(userId);
-
-        // TODO: use claim (default to 'picture'?) instead of custom picture urls
+        user.SetPermission(PermissionKind.EnableLiveTvAccess, enableLiveTv);
+        user.SetPermission(PermissionKind.EnableLiveTvManagement, enableLiveTvAdmin);
 
         if (avatarUrl is not null)
         {
-            try
-            {
-                using HttpClient client = _httpClientFactory.CreateClient();
-
-                var assembly = Assembly.GetExecutingAssembly();
-                FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
-                string version = fvi.FileVersion;
-                client.DefaultRequestHeaders.UserAgent.ParseAdd(
-                    $"Jellyfin-OpenID-Connect +{version} (https://github.com/DaniCatGames/jellyfin-openid-connect)");
-
-                HttpResponseMessage avatarResponse = await client.GetAsync(avatarUrl);
-
-                if (!avatarResponse.IsSuccessStatusCode)
-                {
-                    throw new Exception("Cannot get avatar image: " + avatarUrl);
-                }
-
-                if (!avatarResponse.Content.Headers.TryGetValues("content-type",
-                        out IEnumerable<string> contentTypeList))
-                {
-                    throw new Exception("Cannot get Content-Type of image : " + avatarUrl);
-                }
-
-                string contentType = contentTypeList.First().ToLowerInvariant();
-                string extension = contentType switch
-                {
-                    "image/jpeg" or "image/jpg" => ".jpg",
-                    "image/png" => ".png",
-                    "image/gif" => ".gif",
-                    "image/webp" => ".webp",
-                    "image/avif" => ".avif",
-                    "image/apng" => ".apng",
-                    "image/bmp" => ".bmp",
-                    "image/heic" => ".heic",
-                    "image/heif" => ".heif",
-                    "image/jxl" => ".jxl",
-                    _ => throw new Exception("Content type of avatar URL is not an image, got :  " + contentType),
-                };
-
-                Stream stream = await avatarResponse.Content.ReadAsStreamAsync();
-
-                if (user != null)
-                {
-                    string userDataPath =
-                        Path.Combine(
-                            _serverConfigurationManager.ApplicationPaths.UserConfigurationDirectoryPath,
-                            user.Username);
-                    if (user.ProfileImage is not null)
-                    {
-                        await _userManager.ClearProfileImageAsync(user).ConfigureAwait(false);
-                    }
-
-                    user.ProfileImage = new ImageInfo(Path.Combine(userDataPath, "profile" + extension));
-
-                    await _providerManager.SaveImage(stream, contentType, user.ProfileImage.Path)
-                        .ConfigureAwait(false);
-                }
-            }
-            catch (Exception e)
-            {
-                _logger.LogError(e.Message);
-            }
+            await SetUserAvatar(avatarUrl, user).ConfigureAwait(false);
         }
 
         await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
@@ -727,6 +650,69 @@ public class OpenIDConnectController : ControllerBase
         _logger.LogInformation("Auth request created...");
 
         return await _sessionManager.AuthenticateDirect(authRequest).ConfigureAwait(false);
+    }
+
+    private async Task SetUserAvatar(string avatarUrl, User user)
+    {
+        try
+        {
+            using HttpClient client = _httpClientFactory.CreateClient();
+
+            var assembly = Assembly.GetExecutingAssembly();
+            FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
+            string version = fvi.FileVersion;
+            client.DefaultRequestHeaders.UserAgent.ParseAdd(
+                $"Jellyfin-OpenID-Connect +{version} (https://github.com/DaniCatGames/jellyfin-openid-connect)");
+
+            HttpResponseMessage avatarResponse = await client.GetAsync(avatarUrl);
+
+            if (!avatarResponse.IsSuccessStatusCode)
+            {
+                throw new Exception("Cannot get avatar image: " + avatarUrl);
+            }
+
+            if (!avatarResponse.Content.Headers.TryGetValues("content-type",
+                    out IEnumerable<string> contentTypeList))
+            {
+                throw new Exception("Cannot get Content-Type of image : " + avatarUrl);
+            }
+
+            string contentType = contentTypeList.First().ToLowerInvariant();
+            string extension = contentType switch
+            {
+                "image/jpeg" or "image/jpg" => ".jpg",
+                "image/png" => ".png",
+                "image/gif" => ".gif",
+                "image/webp" => ".webp",
+                "image/avif" => ".avif",
+                "image/apng" => ".apng",
+                "image/bmp" => ".bmp",
+                "image/heic" => ".heic",
+                "image/heif" => ".heif",
+                "image/jxl" => ".jxl",
+                _ => throw new Exception("Content type of avatar URL is not an image, got :  " + contentType),
+            };
+
+            Stream stream = await avatarResponse.Content.ReadAsStreamAsync();
+            
+            string userDataPath =
+                Path.Combine(
+                    _serverConfigurationManager.ApplicationPaths.UserConfigurationDirectoryPath,
+                    user.Username);
+            if (user.ProfileImage is not null)
+            {
+                await _userManager.ClearProfileImageAsync(user).ConfigureAwait(false);
+            }
+
+            user.ProfileImage = new ImageInfo(Path.Combine(userDataPath, "profile" + extension));
+
+            await _providerManager.SaveImage(stream, contentType, user.ProfileImage.Path)
+                .ConfigureAwait(false);
+        }
+        catch (Exception e)
+        {
+            _logger.LogError(e.Message);
+        }
     }
 
     private string GetRequestBase(bool useHttp = false, int? portOverride = null)
