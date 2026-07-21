@@ -7,7 +7,7 @@ const ssoConfigLinking = {
         const provider_list_oid = view.querySelector(`#${provider_list_oid_id}`);
         provider_list_oid.innerHTML = "";
 
-        ApiClient.getJSON(ApiClient.getUrl("OpenIDConnect/GetNames")).then((config_names) => {
+        ApiClient.getJSON(ApiClient.getUrl("OpenIDConnect/Providers/Names")).then((config_names) => {
             ssoConfigLinking.loadProviderList(provider_list_oid, config_names);
         });
     },
