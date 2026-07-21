@@ -50,6 +50,16 @@ public class LinkController : ControllerBase
         [FromRoute] Guid jellyfinUserId,
         [FromBody] AuthResponse authResponse)
     {
+        if (string.IsNullOrEmpty(provider))
+        {
+            return BadRequest("Provider name is required");
+        }
+
+        if (jellyfinUserId == Guid.Empty)
+        {
+            return BadRequest("UserId is required");
+        }
+
         if (!await RequestHelpers.AssertCanUpdateUser(_authContext, HttpContext.Request, jellyfinUserId, true)
                 .ConfigureAwait(false))
         {
@@ -97,6 +107,21 @@ public class LinkController : ControllerBase
         [FromRoute] Guid jellyfinUserId,
         [FromRoute] string sub)
     {
+        if (string.IsNullOrEmpty(provider))
+        {
+            return BadRequest("Provider name is required");
+        }
+
+        if (jellyfinUserId == Guid.Empty)
+        {
+            return BadRequest("UserId is required");
+        }
+
+        if (string.IsNullOrEmpty(sub))
+        {
+            return BadRequest("Sub is required");
+        }
+
         if (!await RequestHelpers.AssertCanUpdateUser(_authContext, HttpContext.Request, jellyfinUserId, true)
                 .ConfigureAwait(false))
         {
@@ -108,8 +133,6 @@ public class LinkController : ControllerBase
         {
             return BadRequest("No matching link found");
         }
-
-        ;
 
         if (linkedId != jellyfinUserId)
         {
@@ -130,6 +153,11 @@ public class LinkController : ControllerBase
     public async Task<ActionResult<SerializableDictionary<string, IEnumerable<string>>>> GetLinksByUser(
         Guid jellyfinUserId)
     {
+        if (jellyfinUserId == Guid.Empty)
+        {
+            return BadRequest("UserId is required");
+        }
+
         if (!await RequestHelpers.AssertCanUpdateUser(_authContext, HttpContext.Request, jellyfinUserId, true)
                 .ConfigureAwait(false))
         {

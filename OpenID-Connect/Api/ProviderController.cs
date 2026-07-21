@@ -21,6 +21,21 @@ public class ProviderController : ControllerBase
     [HttpPut("{provider}")]
     public ActionResult AddProvider(string provider, [FromBody] Config config)
     {
+        if (config.Endpoint == null)
+        {
+            return BadRequest("Endpoint is required");
+        }
+
+        if (config.ClientId == null)
+        {
+            return BadRequest("Client ID is required");
+        }
+
+        if (config.Secret == null)
+        {
+            return BadRequest("Client secret is required");
+        }
+
         PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
         configuration.Configs[provider] = config;
         OpenIDConnect.Instance.UpdateConfiguration(configuration);
@@ -35,8 +50,17 @@ public class ProviderController : ControllerBase
     [HttpDelete("{provider}")]
     public ActionResult DeleteProvider(string provider)
     {
+        if (string.IsNullOrEmpty(provider))
+        {
+            return BadRequest("Provider name is required");
+        }
+
         PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
-        configuration.Configs.Remove(provider);
+        if (!configuration.Configs.Remove(provider))
+        {
+            return NotFound("Provider not found");
+        }
+
         OpenIDConnect.Instance.UpdateConfiguration(configuration);
         return Ok();
     }
