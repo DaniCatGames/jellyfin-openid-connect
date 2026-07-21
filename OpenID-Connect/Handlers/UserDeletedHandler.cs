@@ -10,29 +10,20 @@ namespace Jellyfin.Plugin.OpenIDConnect.Handlers;
 /// <summary>
 ///     Removes links pointing to a jellyfin user when that user is deleted
 /// </summary>
-public partial class UserDeletedHandler : IEventConsumer<UserDeletedEventArgs>
+/// <param name="logger">Instance of the <see cref="ILogger{UserDeletedHandler}" /> interface.</param>
+/// <param name="linkManager">Instance of the <see cref="ILinkManager" /> interface.</param>
+public partial class UserDeletedHandler(
+    ILogger<UserDeletedHandler> logger,
+    ILinkManager linkManager
+) : IEventConsumer<UserDeletedEventArgs>
 {
-    private readonly ILinkManager _linkManager;
-    private readonly ILogger<UserDeletedHandler> _logger;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="UserDeletedHandler" /> class.
-    /// </summary>
-    /// <param name="logger">Instance of the <see cref="ILogger{UserDeletedHandler}" /> interface.</param>
-    /// <param name="linkManager">Instance of the <see cref="ILinkManager" /> interface.</param>
-    public UserDeletedHandler(ILogger<UserDeletedHandler> logger, ILinkManager linkManager)
-    {
-        _logger = logger;
-        _linkManager = linkManager;
-    }
-
     /// <inheritdoc />
     public Task OnEvent(UserDeletedEventArgs eventArgs)
     {
         User user = eventArgs.Argument;
         LogCleaningLinksFor(user.Username);
 
-        _linkManager.DeleteLinksToUser(user.Id);
+        linkManager.DeleteLinksToUser(user.Id);
 
         return Task.CompletedTask;
     }

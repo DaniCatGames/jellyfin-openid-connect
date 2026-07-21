@@ -11,29 +11,19 @@ using Microsoft.AspNetCore.Mvc;
 namespace Jellyfin.Plugin.OpenIDConnect.Api;
 
 /// <summary>
-///     The sso api controller.
+///     The links api controller.
 /// </summary>
+/// <param name="authContext">Instance of the <see cref="IAuthorizationContext" /> interface.</param>
+/// <param name="linkManager">Instance of the <see cref="ILinkManager" /> interface.</param>
+/// <param name="stateManager">Instance of the <see cref="IStateManager" /> interface.</param>
 [ApiController]
 [Route("OpenIDConnect")]
-public class LinkController : ControllerBase
+public class LinkController(
+    IAuthorizationContext authContext,
+    ILinkManager linkManager,
+    IStateManager stateManager
+) : ControllerBase
 {
-    private readonly IAuthorizationContext _authContext;
-    private readonly ILinkManager _linkManager;
-    private readonly IStateManager _stateManager;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="OpenIDConnectController" /> class.
-    /// </summary>
-    /// <param name="authContext">Instance of the <see cref="IAuthorizationContext" /> interface.</param>
-    /// <param name="linkManager">Instance of the <see cref="ILinkManager" /> interface.</param>
-    /// <param name="stateManager">Instance of the <see cref="IStateManager" /> interface.</param>
-    public LinkController(IAuthorizationContext authContext, ILinkManager linkManager, IStateManager stateManager)
-    {
-        _authContext = authContext;
-        _linkManager = linkManager;
-        _stateManager = stateManager;
-    }
-
     /// <summary>
     ///     Create a canonical link for a given user. Must be performed by the user being changed, or admin.
     /// </summary>
@@ -60,7 +50,7 @@ public class LinkController : ControllerBase
             return BadRequest("UserId is required");
         }
 
-        if (!await RequestHelpers.AssertCanUpdateUser(_authContext, HttpContext.Request, jellyfinUserId, true)
+        if (!await RequestHelpers.AssertCanUpdateUser(authContext, HttpContext.Request, jellyfinUserId, true)
                 .ConfigureAwait(false))
         {
             return StatusCode(StatusCodes.Status403Forbidden, "User is not allowed to link SSO providers.");
@@ -71,19 +61,19 @@ public class LinkController : ControllerBase
             return BadRequest("No matching provider found");
         }
 
-        if (!_stateManager.TryGetValue(authResponse.Data, out TimedAuthorizeState timedState))
+        if (!stateManager.TryGetValue(authResponse.Data, out TimedAuthorizeState timedState))
         {
             return Problem("State not found");
         }
 
-        if (!_stateManager.IsValid(timedState))
+        if (!stateManager.IsValid(timedState))
         {
             return Problem("State is not valid");
         }
 
-        _stateManager.TryRemove(authResponse.Data, out _);
+        stateManager.TryRemove(authResponse.Data, out _);
 
-        if (!_linkManager.TryCreateLink(provider, timedState.Sub, jellyfinUserId))
+        if (!linkManager.TryCreateLink(provider, timedState.Sub, jellyfinUserId))
         {
             return BadRequest("Error. Check server logs.");
         }
@@ -122,14 +112,14 @@ public class LinkController : ControllerBase
             return BadRequest("Sub is required");
         }
 
-        if (!await RequestHelpers.AssertCanUpdateUser(_authContext, HttpContext.Request, jellyfinUserId, true)
+        if (!await RequestHelpers.AssertCanUpdateUser(authContext, HttpContext.Request, jellyfinUserId, true)
                 .ConfigureAwait(false))
         {
             return StatusCode(StatusCodes.Status403Forbidden,
                 "Current user is not allowed to unlink SSO providers for user ID.");
         }
 
-        if (!_linkManager.TryGetLink(provider, sub, out Guid linkedId))
+        if (!linkManager.TryGetLink(provider, sub, out Guid linkedId))
         {
             return BadRequest("No matching link found");
         }
@@ -139,7 +129,7 @@ public class LinkController : ControllerBase
             return Conflict("Jellyfin User ID does not match the user id registered to that IdP sub.");
         }
 
-        return _linkManager.TryDeleteLink(provider, sub) ? NoContent() : BadRequest("Error. Check server logs.");
+        return linkManager.TryDeleteLink(provider, sub) ? NoContent() : BadRequest("Error. Check server logs.");
     }
 
     /// <summary>
@@ -158,13 +148,13 @@ public class LinkController : ControllerBase
             return BadRequest("UserId is required");
         }
 
-        if (!await RequestHelpers.AssertCanUpdateUser(_authContext, HttpContext.Request, jellyfinUserId, true)
+        if (!await RequestHelpers.AssertCanUpdateUser(authContext, HttpContext.Request, jellyfinUserId, true)
                 .ConfigureAwait(false))
         {
             return StatusCode(StatusCodes.Status403Forbidden,
                 "Non-admin is not allowed to query other user's mappings.");
         }
 
-        return _linkManager.GetLinksByUser(jellyfinUserId);
+        return linkManager.GetLinksByUser(jellyfinUserId);
     }
 }

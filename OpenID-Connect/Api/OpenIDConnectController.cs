@@ -30,57 +30,31 @@ using Newtonsoft.Json.Linq;
 namespace Jellyfin.Plugin.OpenIDConnect.Api;
 
 /// <summary>
-///     The sso api controller.
+///     The oidc api controller.
 /// </summary>
+/// <param name="logger">Instance of the <see cref="ILogger{OpenIDConnectController}" /> interface.</param>
+/// <param name="loggerFactory">Instance of the <see cref="ILoggerFactory" /> interface.</param>
+/// <param name="sessionManager">Instance of the <see cref="ISessionManager" /> interface.</param>
+/// <param name="userManager">Instance of the <see cref="IUserManager" /> interface.</param>
+/// <param name="providerManager">Instance of the <see cref="IProviderManager" /> interface.</param>
+/// <param name="httpClientFactory">Instance of the <see cref="IHttpClientFactory" /> interface.</param>
+/// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager" /> interface.</param>
+/// <param name="stateManager">Instance of the <see cref="IStateManager" /> interface.</param>
+/// <param name="linkManager">Instance of the <see cref="ILinkManager" /> interface.</param>
 [ApiController]
 [Route("[controller]")]
-public class OpenIDConnectController : ControllerBase
+public class OpenIDConnectController(
+    ILogger<OpenIDConnectController> logger,
+    ILoggerFactory loggerFactory,
+    ISessionManager sessionManager,
+    IUserManager userManager,
+    IProviderManager providerManager,
+    IHttpClientFactory httpClientFactory,
+    IServerConfigurationManager serverConfigurationManager,
+    IStateManager stateManager,
+    ILinkManager linkManager
+) : ControllerBase
 {
-    private readonly IHttpClientFactory _httpClientFactory;
-    private readonly ILinkManager _linkManager;
-    private readonly ILogger<OpenIDConnectController> _logger;
-    private readonly ILoggerFactory _loggerFactory;
-    private readonly IProviderManager _providerManager;
-    private readonly IServerConfigurationManager _serverConfigurationManager;
-    private readonly ISessionManager _sessionManager;
-    private readonly IStateManager _stateManager;
-    private readonly IUserManager _userManager;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="OpenIDConnectController" /> class.
-    /// </summary>
-    /// <param name="logger">Instance of the <see cref="ILogger{OpenIDConnectController}" /> interface.</param>
-    /// <param name="loggerFactory">Instance of the <see cref="ILoggerFactory" /> interface.</param>
-    /// <param name="sessionManager">Instance of the <see cref="ISessionManager" /> interface.</param>
-    /// <param name="userManager">Instance of the <see cref="IUserManager" /> interface.</param>
-    /// <param name="providerManager">Instance of the <see cref="IProviderManager" /> interface.</param>
-    /// <param name="httpClientFactory">Instance of the <see cref="IHttpClientFactory" /> interface.</param>
-    /// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager" /> interface.</param>
-    /// <param name="stateManager">Instance of the <see cref="IStateManager" /> interface.</param>
-    /// <param name="linkManager">Instance of the <see cref="ILinkManager" /> interface.</param>
-    public OpenIDConnectController(
-        ILogger<OpenIDConnectController> logger,
-        ILoggerFactory loggerFactory,
-        ISessionManager sessionManager,
-        IUserManager userManager,
-        IProviderManager providerManager,
-        IHttpClientFactory httpClientFactory,
-        IServerConfigurationManager serverConfigurationManager,
-        IStateManager stateManager,
-        ILinkManager linkManager)
-    {
-        _sessionManager = sessionManager;
-        _userManager = userManager;
-        _logger = logger;
-        _loggerFactory = loggerFactory;
-        _providerManager = providerManager;
-        _serverConfigurationManager = serverConfigurationManager;
-        _httpClientFactory = httpClientFactory;
-        _stateManager = stateManager;
-        _linkManager = linkManager;
-        _logger.LogInformation("OpenID Connect Controller initialized");
-    }
-
     /// <summary>
     ///     The GET endpoint for the OpenID provider to call back to. Returns a webpage that parses client data and completes
     ///     auth.
@@ -106,8 +80,8 @@ public class OpenIDConnectController : ControllerBase
             return BadRequest("Missing state");
         }
 
-        if (!_stateManager.TryGetValue(state, out TimedAuthorizeState timedState)
-            || _stateManager.IsExpired(timedState))
+        if (!stateManager.TryGetValue(state, out TimedAuthorizeState timedState)
+            || stateManager.IsExpired(timedState))
         {
             return BadRequest("Invalid or expired state");
         }
@@ -129,7 +103,7 @@ public class OpenIDConnectController : ControllerBase
 
         if (timedState.IsTesting)
         {
-            _stateManager.TryRemove(state, out _);
+            stateManager.TryRemove(state, out _);
 
             string htmlOutput = WebResponse.GenerateHtmlTestingPage(provider, result.User.Claims);
 
@@ -193,7 +167,7 @@ public class OpenIDConnectController : ControllerBase
         }
         else
         {
-            _logger.LogWarning("OpenID user {Username} does not have a sub claim", timedState.Sub);
+            logger.LogWarning("OpenID user {Username} does not have a sub claim", timedState.Sub);
             return Unauthorized("Error. Check IdP or plugin config.");
         }
 
@@ -203,7 +177,7 @@ public class OpenIDConnectController : ControllerBase
 
         if (!timedState.Valid)
         {
-            _logger.LogWarning(
+            logger.LogWarning(
                 "OpenID user {Username} has one or more incorrect role claims: {@Claims}. Expected any one of: {@ExpectedClaims}",
                 timedState.Username,
                 result.User.Claims.Select(o => new { o.Type, o.Value }),
@@ -213,7 +187,7 @@ public class OpenIDConnectController : ControllerBase
         }
 
         bool isLinking = timedState.IsLinking;
-        _logger.LogInformation($"Is request linking: {isLinking}");
+        logger.LogInformation($"Is request linking: {isLinking}");
         return Content(WebResponse.Generator(state,
                 provider,
                 GetRequestBase(config.UseHTTP, config.PortOverride),
@@ -256,11 +230,11 @@ public class OpenIDConnectController : ControllerBase
                           + $"/OpenIDConnect/redirect/{provider}",
             Scope = string.Join(" ", scopes.Prepend("openid profile")),
             DisablePushedAuthorization = config.DisablePushedAuthorization,
-            LoggerFactory = _loggerFactory,
+            LoggerFactory = loggerFactory,
             LoadProfile = !config.DoNotLoadProfile,
             HttpClientFactory = _ =>
             {
-                HttpClient client = _httpClientFactory.CreateClient();
+                HttpClient client = httpClientFactory.CreateClient();
                 var assembly = Assembly.GetExecutingAssembly();
                 FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
                 string version = fvi.FileVersion;
@@ -315,7 +289,7 @@ public class OpenIDConnectController : ControllerBase
             }
             catch (JsonException error)
             {
-                _logger.LogError(error, "Error parsing JSON role claim: {Claim}", claim.Value);
+                logger.LogError(error, "Error parsing JSON role claim: {Claim}", claim.Value);
                 return;
             }
         }
@@ -377,7 +351,7 @@ public class OpenIDConnectController : ControllerBase
         [FromQuery] bool isLinking = false,
         [FromQuery] bool isTesting = false)
     {
-        _stateManager.Invalidate();
+        stateManager.Invalidate();
 
         if (!OpenIDConnect.Instance.Configuration.Configs.TryGetValue(provider, out Config config)
             || !config.Enabled)
@@ -404,7 +378,7 @@ public class OpenIDConnectController : ControllerBase
             IsTesting = isTesting,
         };
 
-        _stateManager.TryAdd(state.State, timedState);
+        stateManager.TryAdd(state.State, timedState);
 
         return Redirect(state.StartUrl);
     }
@@ -418,7 +392,7 @@ public class OpenIDConnectController : ControllerBase
     [HttpGet("States")]
     public ActionResult GetRunningFlows()
     {
-        return Ok(_stateManager.GetStates());
+        return Ok(stateManager.GetStates());
     }
 
     /// <summary>
@@ -438,7 +412,7 @@ public class OpenIDConnectController : ControllerBase
             return BadRequest("Provider does not exist");
         }
 
-        if (!_stateManager.TryGetValue(response.Data, out TimedAuthorizeState timedState))
+        if (!stateManager.TryGetValue(response.Data, out TimedAuthorizeState timedState))
         {
             return Problem("State not found");
         }
@@ -452,7 +426,7 @@ public class OpenIDConnectController : ControllerBase
 
         if (userId == Guid.Empty)
         {
-            _stateManager.TryRemove(response.Data, out _);
+            stateManager.TryRemove(response.Data, out _);
             return Unauthorized("User provisioning or linking with this user is disabled.");
         }
 
@@ -468,7 +442,7 @@ public class OpenIDConnectController : ControllerBase
                 timedState.AvatarURL)
             .ConfigureAwait(false);
 
-        _stateManager.TryRemove(response.Data, out _);
+        stateManager.TryRemove(response.Data, out _);
         return Ok(authenticationResult);
     }
 
@@ -482,16 +456,16 @@ public class OpenIDConnectController : ControllerBase
     [HttpPost("Unregister/{username}")]
     public async Task<ActionResult> UnregisterUserFromOidc(string username, [FromBody] string provider)
     {
-        User user = _userManager.GetUserByName(username);
+        User user = userManager.GetUserByName(username);
         if (user == null)
         {
             return NotFound("User not found");
         }
 
         user.AuthenticationProviderId = provider;
-        await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
+        await userManager.UpdateUserAsync(user).ConfigureAwait(false);
 
-        _linkManager.DeleteLinksToUser(user.Id);
+        linkManager.DeleteLinksToUser(user.Id);
 
         return Ok();
     }
@@ -499,22 +473,22 @@ public class OpenIDConnectController : ControllerBase
     private async Task<Guid> GetOrCreateUser(string provider, string sub, string username, Config config)
     {
         // Check if there is already a link for this sub, else get empty id
-        bool linkExists = _linkManager.TryGetLink(provider, sub, out Guid userId);
+        bool linkExists = linkManager.TryGetLink(provider, sub, out Guid userId);
         User user;
 
         if (linkExists)
         {
-            user = _userManager.GetUserById(userId);
+            user = userManager.GetUserById(userId);
             if (user != null)
             {
-                _logger.LogInformation("Found link to jellyfin user {username} from sub {sub} on IdP {provider}.",
+                logger.LogInformation("Found link to jellyfin user {username} from sub {sub} on IdP {provider}.",
                     user.Username,
                     sub,
                     provider);
                 return user.Id;
             }
 
-            _logger.LogWarning(
+            logger.LogWarning(
                 "OIDC user link exists between sub {sub} and jellyfin userId {userid}, but jellyfin user doesn't exist.",
                 sub,
                 userId);
@@ -523,7 +497,7 @@ public class OpenIDConnectController : ControllerBase
 
         // There is no link to this user yet.
         // Try to get user by username
-        user = _userManager.GetUserByName(username);
+        user = userManager.GetUserByName(username);
 
         if (user != null)
         {
@@ -531,7 +505,7 @@ public class OpenIDConnectController : ControllerBase
             if (config.AutoLinkingAllowList == null
                 || !config.AutoLinkingAllowList.Contains(username, StringComparer.OrdinalIgnoreCase))
             {
-                _logger.LogWarning(
+                logger.LogWarning(
                     "OIDC user {Username} already exists, but is not in the linking allowlist. Not linking user.",
                     username);
                 return Guid.Empty;
@@ -542,11 +516,11 @@ public class OpenIDConnectController : ControllerBase
                 .ToArray();
             OpenIDConnect.Instance.UpdateConfiguration(OpenIDConnect.Instance.Configuration);
 
-            _logger.LogInformation(
+            logger.LogInformation(
                 "OIDC user link doesn't exist, creating new link between sub {sub} and jellyfin user {username}.",
                 sub,
                 username);
-            _linkManager.TryCreateLink(provider, sub, user.Id);
+            linkManager.TryCreateLink(provider, sub, user.Id);
             return user.Id;
         }
 
@@ -557,22 +531,22 @@ public class OpenIDConnectController : ControllerBase
             return Guid.Empty;
         }
 
-        _logger.LogInformation("OIDC user {Username} doesn't exist, creating...", username);
+        logger.LogInformation("OIDC user {Username} doesn't exist, creating...", username);
         user = await CreateUserAndLink(provider, sub, username);
         return user.Id;
     }
 
     private async Task<User> CreateUserAndLink(string provider, string sub, string username)
     {
-        User user = await _userManager.CreateUserAsync(username).ConfigureAwait(false);
+        User user = await userManager.CreateUserAsync(username).ConfigureAwait(false);
 
         user.SetPermission(PermissionKind.EnableAllFolders, false);
         user.SetPreference(PreferenceKind.EnabledFolders, []);
 
         user.AuthenticationProviderId = "Jellyfin.Plugin.OpenIDConnect.AuthProvider";
-        await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
+        await userManager.UpdateUserAsync(user).ConfigureAwait(false);
 
-        _linkManager.TryCreateLink(provider, sub, user.Id);
+        linkManager.TryCreateLink(provider, sub, user.Id);
         return user;
     }
 
@@ -599,7 +573,7 @@ public class OpenIDConnectController : ControllerBase
         AuthResponse authResponse,
         string avatarUrl)
     {
-        User user = _userManager.GetUserById(userId);
+        User user = userManager.GetUserById(userId);
 
         if (user == null)
         {
@@ -636,7 +610,7 @@ public class OpenIDConnectController : ControllerBase
             await SetUserAvatar(avatarUrl, user).ConfigureAwait(false);
         }
 
-        await _userManager.UpdateUserAsync(user).ConfigureAwait(false);
+        await userManager.UpdateUserAsync(user).ConfigureAwait(false);
 
         var authRequest = new AuthenticationRequest
         {
@@ -647,16 +621,16 @@ public class OpenIDConnectController : ControllerBase
             DeviceId = authResponse.DeviceId,
             DeviceName = authResponse.DeviceName,
         };
-        _logger.LogInformation("Auth request created...");
+        logger.LogInformation("Auth request created...");
 
-        return await _sessionManager.AuthenticateDirect(authRequest).ConfigureAwait(false);
+        return await sessionManager.AuthenticateDirect(authRequest).ConfigureAwait(false);
     }
 
     private async Task SetUserAvatar(string avatarUrl, User user)
     {
         try
         {
-            using HttpClient client = _httpClientFactory.CreateClient();
+            using HttpClient client = httpClientFactory.CreateClient();
 
             var assembly = Assembly.GetExecutingAssembly();
             FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
@@ -694,24 +668,24 @@ public class OpenIDConnectController : ControllerBase
             };
 
             Stream stream = await avatarResponse.Content.ReadAsStreamAsync();
-            
+
             string userDataPath =
                 Path.Combine(
-                    _serverConfigurationManager.ApplicationPaths.UserConfigurationDirectoryPath,
+                    serverConfigurationManager.ApplicationPaths.UserConfigurationDirectoryPath,
                     user.Username);
             if (user.ProfileImage is not null)
             {
-                await _userManager.ClearProfileImageAsync(user).ConfigureAwait(false);
+                await userManager.ClearProfileImageAsync(user).ConfigureAwait(false);
             }
 
             user.ProfileImage = new ImageInfo(Path.Combine(userDataPath, "profile" + extension));
 
-            await _providerManager.SaveImage(stream, contentType, user.ProfileImage.Path)
+            await providerManager.SaveImage(stream, contentType, user.ProfileImage.Path)
                 .ConfigureAwait(false);
         }
         catch (Exception e)
         {
-            _logger.LogError(e.Message);
+            logger.LogError(e.Message);
         }
     }
 

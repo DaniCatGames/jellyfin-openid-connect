@@ -1,9 +1,5 @@
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using MediaBrowser.Controller.Library;
-using MediaBrowser.Controller.Net;
-using MediaBrowser.Controller.Session;
 using MediaBrowser.Model;
 using MediaBrowser.Model.Plugins;
 using Microsoft.AspNetCore.Mvc;
@@ -14,46 +10,22 @@ namespace Jellyfin.Plugin.OpenIDConnect.Views;
 /// <summary>
 ///     The sso views controller.
 /// </summary>
+/// <param name="logger">Instance of the <see cref="ILogger{OpenIDConnectViewsController}" /> interface.</param>
 [ApiController]
 [Route("[controller]")]
-public class OpenIDConnectViewsController : ControllerBase
+public class OpenIDConnectViewsController(
+    ILogger<OpenIDConnectViewsController> logger
+) : ControllerBase
 {
-    private readonly IAuthorizationContext _authContext;
-    private readonly ILogger<OpenIDConnectViewsController> _logger;
-    private readonly ISessionManager _sessionManager;
-    private readonly IUserManager _userManager;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="OpenIDConnectViewsController" /> class.
-    /// </summary>
-    /// <param name="logger">Instance of the <see cref="ILogger{OpenIDConnectViewsController}" /> interface.</param>
-    /// <param name="sessionManager">Instance of the <see cref="ISessionManager" /> interface.</param>
-    /// <param name="authContext">Instance of the <see cref="IAuthorizationContext" /> interface.</param>
-    /// <param name="userManager">Instance of the <see cref="IUserManager" /> interface.</param>
-    public OpenIDConnectViewsController(
-        ILogger<OpenIDConnectViewsController> logger,
-        ISessionManager sessionManager,
-        IUserManager userManager,
-        IAuthorizationContext authContext)
-    {
-        _sessionManager = sessionManager;
-        _userManager = userManager;
-        _authContext = authContext;
-        _logger = logger;
-        _logger.LogInformation("OpenID Connect Views Controller initialized");
-    }
-
     private ActionResult ServeView(string viewName)
     {
-        IEnumerable<PluginPageInfo> pages = null;
         if (OpenIDConnect.Instance == null)
         {
             return BadRequest("No plugin instance found");
         }
 
-        pages = OpenIDConnect.Instance.GetViews();
-
-        PluginPageInfo view = pages.FirstOrDefault(pageInfo => pageInfo.Name == viewName, null);
+        PluginPageInfo view = OpenIDConnect.Instance.GetViews()
+            .FirstOrDefault(pageInfo => pageInfo.Name == viewName, null);
 
         if (view == null)
         {
@@ -64,7 +36,7 @@ public class OpenIDConnectViewsController : ControllerBase
 
         if (stream == null)
         {
-            _logger.LogError("Failed to get resource {Resource}", view.EmbeddedResourcePath);
+            logger.LogError("Failed to get resource {Resource}", view.EmbeddedResourcePath);
             return NotFound();
         }
 #nullable disable
