@@ -168,6 +168,8 @@
                                     <code>resource_access.&gt;clientId&lt;.roles</code> (client)
                                     <br/>
                                     <strong>Authelia:</strong> <code>groups</code>
+                                    <br/>
+                                    Defaults to <code>groups</code>.
                                 </div>
                             </div>
 
@@ -214,7 +216,7 @@
                             <div class="inputContainer" id="Container-Roles">
                                 <label class="inputLabel inputLabelUnfocused" for="Roles">Allowed Roles</label>
                                 <textarea class="oidc-line-list emby-textarea" id="Roles" is="emby-textarea"
-                                          placeholder="admin&#10;user&#10;editor"></textarea>
+                                          placeholder="user&#10;editor"></textarea>
                                 <div class="fieldDescription">
                                     One role per line. If the user has any of these roles in their OIDC response,
                                     they are authenticated. Leave blank to disable role checking.
