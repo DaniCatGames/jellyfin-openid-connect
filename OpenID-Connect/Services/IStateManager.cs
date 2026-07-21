@@ -63,34 +63,17 @@ public interface IStateManager
 /// <summary>
 ///     A manager for OpenID to manage the state of the clients.
 /// </summary>
-public class TimedAuthorizeState
+public class TimedAuthorizeState(AuthorizeState state, DateTime created)
 {
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="TimedAuthorizeState" /> class.
-    /// </summary>
-    /// <param name="state">The AuthorizeState to time.</param>
-    /// <param name="created">When this state was created.</param>
-    public TimedAuthorizeState(AuthorizeState state, DateTime created)
-    {
-        State = state;
-        Created = created;
-        Valid = false;
-        Admin = false;
-        IsLinking = false;
-        EnableLiveTv = false;
-        EnableLiveTvManagement = false;
-        AvatarURL = null;
-    }
-
     /// <summary>
     ///     Gets or sets the Authorization State of the client.
     /// </summary>
-    public AuthorizeState State { get; set; }
+    public AuthorizeState State { get; } = state;
 
     /// <summary>
     ///     Gets or sets when this object was created to time it out.
     /// </summary>
-    public DateTime Created { get; set; }
+    public DateTime Created { get; } = created;
 
     /// <summary>
     ///     Gets or sets a value indicating whether the user is valid.
@@ -116,13 +99,13 @@ public class TimedAuthorizeState
     ///     Gets or sets a value indicating whether the state is
     ///     tied to a linking flow (instead of a login flow).
     /// </summary>
-    public bool IsLinking { get; set; }
+    public bool IsLinking { get; init; }
 
     /// <summary>
     ///     Gets or sets a value indicating whether the state is
     ///     tied to a testing flow (instead of a login flow).
     /// </summary>
-    public bool IsTesting { get; set; }
+    public bool IsTesting { get; init; }
 
     /// <summary>
     ///     Gets or sets the folders the user is allowed access to.

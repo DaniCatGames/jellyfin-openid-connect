@@ -709,35 +709,12 @@ public class OpenIDConnectController(
     }
 }
 
-// ReSharper disable UnusedAutoPropertyAccessor.Global
 /// <summary>
 ///     The data the client should pass back to the API.
 /// </summary>
-public class AuthResponse
-{
-    /// <summary>
-    ///     Gets or sets the device ID of the client.
-    /// </summary>
-    public string DeviceId { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the device name of the client.
-    /// </summary>
-    public string DeviceName { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the app name of the client.
-    /// </summary>
-    public string AppName { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the app version of the client.
-    /// </summary>
-    public string AppVersion { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the auth data of the client (for authorizing the response).
-    /// </summary>
-    public string Data { get; set; }
-}
-// ReSharper restore UnusedAutoPropertyAccessor.Global
+/// <param name="DeviceId">The device ID of the client.</param>
+/// <param name="DeviceName">The device name of the client.</param>
+/// <param name="AppName">The app name of the client.</param>
+/// <param name="AppVersion">The app version of the client.</param>
+/// <param name="Data">The auth data of the client (for authorizing the response).</param>
+public record AuthResponse(string DeviceId, string DeviceName, string AppName, string AppVersion, string Data);
