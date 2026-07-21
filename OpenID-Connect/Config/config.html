@@ -384,10 +384,13 @@
                             <div class="inputContainer">
                                 <label class="inputLabel inputLabelUnfocused" for="Scopes">Additional Scopes</label>
                                 <textarea class="oidc-line-list emby-textarea" id="Scopes" is="emby-textarea"
-                                          placeholder="profile&#10;email&#10;groups"></textarea>
+                                          placeholder="email"></textarea>
                                 <div class="fieldDescription">
                                     One scope per line. Some providers (e.g. Authelia) require additional scopes
                                     for group membership validation. Leave blank for default scopes only.
+                                    <br/>
+                                    <code>openid</code> and <code>profile</code> are always included and should not be
+                                    listed here.
                                 </div>
                             </div>
                         </div>
