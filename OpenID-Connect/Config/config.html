@@ -101,7 +101,7 @@
                                     Name</label>
                                 <input class="oidc-text" id="ProviderName" is="emby-input" required="" type="text"/>
                                 <div class="fieldDescription">
-                                    Provieder identifier (must be unique), used to identify this provider in API calls
+                                    Provider identifier (must be unique), used to identify this provider in API calls
                                     and links.
                                 </div>
                             </div>
@@ -239,8 +239,8 @@
                                     <span>Auto Provision Users</span>
                                 </label>
                                 <div class="fieldDescription checkboxFieldDescription">
-                                    When enabled, users will be automatically created upon first login if they have no
-                                    matching link in <!--TODO: autolinking allowlist reference-->
+                                    When enabled, users will be automatically created upon first login if their name is
+                                    different from any existing jellyfin users
                                 </div>
                             </div>
 

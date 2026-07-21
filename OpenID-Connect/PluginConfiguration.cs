@@ -52,6 +52,36 @@ public class Config
     public bool Enabled { get; set; }
 
     /// <summary>
+    ///     Gets or sets the claim to check roles against. Separated by "."s.
+    /// </summary>
+    public string RoleClaim { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the default username claim when creating new accounts.
+    /// </summary>
+    public string DefaultUsernameClaim { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the claim containing the profile picture for the user.
+    /// </summary>
+    public string AvatarClaim { get; set; }
+
+    /// <summary>
+    ///     Gets or sets a value indicating whether RBAC is enabled.
+    /// </summary>
+    public bool EnableAuthorization { get; set; }
+
+    /// <summary>
+    ///     Gets or sets what roles are checked to determine whether the user is allowed to use Jellyfin.
+    /// </summary>
+    public string[] Roles { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the roles that are checked to determine whether the user is an administrator.
+    /// </summary>
+    public string[] AdminRoles { get; set; }
+
+    /// <summary>
     ///     Gets or sets a value indicating whether the IdP will autoprovision users.
     /// </summary>
     public bool EnableUserProvisioning { get; set; }
@@ -60,11 +90,6 @@ public class Config
     ///     Gets or sets the list of users that IdP users can be linked to.
     /// </summary>
     public string[] AutoLinkingAllowList { get; set; }
-
-    /// <summary>
-    ///     Gets or sets a value indicating whether RBAC is enabled.
-    /// </summary>
-    public bool EnableAuthorization { get; set; }
 
     /// <summary>
     ///     Gets or sets a value indicating whether all folders are allowed by default.
@@ -77,24 +102,16 @@ public class Config
     public string[] EnabledFolders { get; set; }
 
     /// <summary>
-    ///     Gets or sets the roles that are checked to determine whether the user is an administrator.
-    /// </summary>
-    public string[] AdminRoles { get; set; }
-
-    /// <summary>
-    ///     Gets or sets what roles are checked to determine whether the user is allowed to use Jellyfin.
-    /// </summary>
-    public string[] Roles { get; set; }
-
-    /// <summary>
     ///     Gets or sets a value indicating whether RBAC is used to manage folder access.
     /// </summary>
     public bool EnableFolderRoles { get; set; }
 
     /// <summary>
-    ///     Gets or sets a value indicating whether RBAC is used to manage Live TV access.
+    ///     Gets or sets which folders map to what roles in RBAC.
     /// </summary>
-    public bool EnableLiveTvRoles { get; set; }
+    [XmlArray("FolderRoleMappings")]
+    [XmlArrayItem(typeof(FolderRoleMap), ElementName = "FolderRoleMappings")]
+    public List<FolderRoleMap> FolderRoleMapping { get; set; }
 
     /// <summary>
     ///     Gets or sets a value indicating whether Live TV is enabled by default.
@@ -107,6 +124,11 @@ public class Config
     public bool EnableLiveTvManagement { get; set; }
 
     /// <summary>
+    ///     Gets or sets a value indicating whether RBAC is used to manage Live TV access.
+    /// </summary>
+    public bool EnableLiveTvRoles { get; set; }
+
+    /// <summary>
     ///     Gets or sets the roles that are checked to determine whether the user is allowed to view Live TV.
     /// </summary>
     public string[] LiveTvRoles { get; set; }
@@ -117,51 +139,9 @@ public class Config
     public string[] LiveTvManagementRoles { get; set; }
 
     /// <summary>
-    ///     Gets or sets which folders map to what roles in RBAC.
-    /// </summary>
-    [XmlArray("FolderRoleMappings")]
-    [XmlArrayItem(typeof(FolderRoleMap), ElementName = "FolderRoleMappings")]
-    public List<FolderRoleMap> FolderRoleMapping { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the claim to check roles against. Separated by "."s.
-    /// </summary>
-    public string RoleClaim { get; set; }
-
-    /// <summary>
     ///     Gets or Sets additional Scopes to request access to in the authorization request.
     /// </summary>
     public string[] Scopes { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the whether http is used for redirect urls.
-    /// </summary>
-    public bool UseHTTP { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the redirect port override.
-    /// </summary>
-    public int? PortOverride { get; set; }
-
-    /// <summary>
-    ///     Gets or sets a mapping of canonical names from the provider to jellyfin user ids.
-    /// </summary>
-    [XmlElement("Links")]
-    public SerializableDictionary<string, Guid> Links
-    {
-        get => field ?? new SerializableDictionary<string, Guid>();
-        set;
-    }
-
-    /// <summary>
-    ///     Gets or sets the default username claim when creating new accounts.
-    /// </summary>
-    public string DefaultUsernameClaim { get; set; }
-
-    /// <summary>
-    ///     Gets or sets the claim containing the profile picture for the user.
-    /// </summary>
-    public string AvatarClaim { get; set; }
 
     /// <summary>
     ///     Gets or sets a value indicating whether HTTPS in the discovery endpoint is required.
@@ -184,9 +164,29 @@ public class Config
     public bool DoNotValidateIssuerName { get; set; }
 
     /// <summary>
+    ///     Gets or sets the whether http is used for redirect urls.
+    /// </summary>
+    public bool UseHTTP { get; set; }
+
+    /// <summary>
     ///     Gets or sets a value indicating whether the UserInfo endpoint is used to get profile data.
     /// </summary>
     public bool DoNotLoadProfile { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the redirect port override.
+    /// </summary>
+    public int? PortOverride { get; set; }
+
+    /// <summary>
+    ///     Gets or sets a mapping of canonical names from the provider to jellyfin user ids.
+    /// </summary>
+    [XmlElement("Links")]
+    public SerializableDictionary<string, Guid> Links
+    {
+        get => field ?? new SerializableDictionary<string, Guid>();
+        set;
+    }
 }
 
 /// <summary>

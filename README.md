@@ -55,7 +55,7 @@ This is 100% alpha software! PRs are welcome to improve the code.
 - Kanidm
 - Google OpenID: Works, but usernames are all numeric
 
-While the above providers are apprently working, I personally only use and test with Authentik
+While the above providers are apparently working, I personally only use and test with Authentik
 
 ## Installing
 
