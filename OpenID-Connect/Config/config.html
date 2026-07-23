@@ -202,14 +202,25 @@
                         <div class="collapseContent">
                             <div class="checkboxContainer checkboxContainer-withDescription">
                                 <label>
-                                    <input class="oidc-toggle" id="EnableAuthorization" is="emby-checkbox"
-                                           name="EnableAuthorization" type="checkbox"/>
-                                    <span>Auto-set Permissions on Login</span>
+                                    <input class="oidc-toggle" id="EnableUserProvisioning" is="emby-checkbox"
+                                           name="EnableUserProvisioning" type="checkbox"/>
+                                    <span>Auto Provision Users</span>
                                 </label>
                                 <div class="fieldDescription checkboxFieldDescription">
-                                    If enabled, the plugin sets permissions for users on first login.
-                                    Existing users' permissions are not rewritten on subsequent logins.
-                                    If disabled, an admin must grant permissions manually.
+                                    When enabled, users will be automatically created upon first login if their name is
+                                    different from any existing jellyfin users
+                                </div>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label>
+                                    <input checked class="oidc-toggle" id="UpdateUsersOnLogin" is="emby-checkbox"
+                                           name="UpdateUsersOnLogin" type="checkbox"/>
+                                    <span>Update Users on Login</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    If enabled, user info and permissions are updated on every login.
+                                    If disabled, permissions and info are only set on creation.
                                 </div>
                             </div>
 
@@ -231,18 +242,6 @@
                                 <div class="fieldDescription">
                                     One role per line. Users with any of these roles receive admin privileges.
                                     Leave blank to not auto-grant admin.
-                                </div>
-                            </div>
-
-                            <div class="checkboxContainer checkboxContainer-withDescription">
-                                <label>
-                                    <input class="oidc-toggle" id="EnableUserProvisioning" is="emby-checkbox"
-                                           name="EnableUserProvisioning" type="checkbox"/>
-                                    <span>Auto Provision Users</span>
-                                </label>
-                                <div class="fieldDescription checkboxFieldDescription">
-                                    When enabled, users will be automatically created upon first login if their name is
-                                    different from any existing jellyfin users
                                 </div>
                             </div>
 

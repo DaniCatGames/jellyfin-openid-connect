@@ -408,7 +408,7 @@ public class OpenIDConnectController(
             return Problem("State is not valid.");
         }
 
-        Guid userId = await GetOrCreateUser(provider, timedState.Sub, timedState.Username, config);
+        Guid userId = await GetOrCreateUser(provider, timedState, config);
 
         if (userId == Guid.Empty)
         {
@@ -447,10 +447,10 @@ public class OpenIDConnectController(
         return Ok();
     }
 
-    private async Task<Guid> GetOrCreateUser(string provider, string sub, string username, Config config)
+    private async Task<Guid> GetOrCreateUser(string provider, TimedAuthorizeState timedState, Config config)
     {
         // Check if there is already a link for this sub, else get empty id
-        bool linkExists = linkManager.TryGetLink(provider, sub, out Guid userId);
+        bool linkExists = linkManager.TryGetLink(provider, timedState.Sub, out Guid userId);
         User user;
 
         if (linkExists)
@@ -460,44 +460,44 @@ public class OpenIDConnectController(
             {
                 logger.LogInformation("Found link to jellyfin user {username} from sub {sub} on IdP {provider}.",
                     user.Username,
-                    sub,
+                    timedState.Sub,
                     provider);
                 return user.Id;
             }
 
             logger.LogWarning(
                 "OIDC user link exists between sub {sub} and jellyfin userId {userid}, but jellyfin user doesn't exist.",
-                sub,
+                timedState.Sub,
                 userId);
             return Guid.Empty;
         }
 
         // There is no link to this user yet.
         // Try to get user by username
-        user = userManager.GetUserByName(username);
+        user = userManager.GetUserByName(timedState.Username);
 
         if (user != null)
         {
             // If a user is found with the same username, check if they can be linked, else stop and dont continue
             if (config.AutoLinkingAllowList == null
-                || !config.AutoLinkingAllowList.Contains(username, StringComparer.OrdinalIgnoreCase))
+                || !config.AutoLinkingAllowList.Contains(timedState.Username, StringComparer.OrdinalIgnoreCase))
             {
                 logger.LogWarning(
                     "OIDC user {Username} already exists, but is not in the linking allowlist. Not linking user.",
-                    username);
+                    timedState.Username);
                 return Guid.Empty;
             }
 
             config.AutoLinkingAllowList = config.AutoLinkingAllowList
-                .Where(u => !u.Equals(username, StringComparison.OrdinalIgnoreCase))
+                .Where(u => !u.Equals(timedState.Username, StringComparison.OrdinalIgnoreCase))
                 .ToArray();
             OpenIDConnect.Instance.UpdateConfiguration(OpenIDConnect.Instance.Configuration);
 
             logger.LogInformation(
                 "OIDC user link doesn't exist, creating new link between sub {sub} and jellyfin user {username}.",
-                sub,
-                username);
-            linkManager.TryCreateLink(provider, sub, user.Id);
+                timedState.Sub,
+                user.Username);
+            linkManager.TryCreateLink(provider, timedState.Username, user.Id);
             return user.Id;
         }
 
@@ -508,8 +508,9 @@ public class OpenIDConnectController(
             return Guid.Empty;
         }
 
-        logger.LogInformation("OIDC user {Username} doesn't exist, creating...", username);
-        user = await CreateUserAndLink(provider, sub, username);
+        logger.LogInformation("OIDC user {Username} doesn't exist, creating...", timedState.Username);
+        user = await CreateUserAndLink(provider, timedState.Sub, timedState.Username).ConfigureAwait(false);
+        await UpdateUser(config, timedState, user).ConfigureAwait(false);
         return user.Id;
     }
 
@@ -547,7 +548,10 @@ public class OpenIDConnectController(
             throw new Exception("User not found");
         }
 
-        await UpdateUser(config, timedState, user).ConfigureAwait(false);
+        if (config.UpdateUsersOnLogin)
+        {
+            await UpdateUser(config, timedState, user).ConfigureAwait(false);
+        }
 
         var authRequest = new AuthenticationRequest
         {
@@ -568,34 +572,31 @@ public class OpenIDConnectController(
         TimedAuthorizeState timedState,
         User user)
     {
-        if (config.EnableAuthorization)
+        user.SetPermission(PermissionKind.IsAdministrator, timedState.Admin);
+        user.SetPermission(PermissionKind.EnableAllFolders, config.EnableAllFolders);
+
+        // Parse folder IDs to GUIDs
+        var folderGuids = new List<Guid>(timedState.DefaultAllowedFolders.Count + timedState.RbacFolders.Count);
+
+        // Add folders that are allowed by default
+        foreach (string folderId in timedState.DefaultAllowedFolders)
         {
-            user.SetPermission(PermissionKind.IsAdministrator, timedState.Admin);
-            user.SetPermission(PermissionKind.EnableAllFolders, config.EnableAllFolders);
-
-            // Parse folder IDs to GUIDs
-            var folderGuids = new List<Guid>(timedState.DefaultAllowedFolders.Count + timedState.RbacFolders.Count);
-
-            // Add folders that are allowed by default
-            foreach (string folderId in timedState.DefaultAllowedFolders)
+            if (Guid.TryParse(folderId, out Guid folderGuid))
             {
-                if (Guid.TryParse(folderId, out Guid folderGuid))
-                {
-                    folderGuids.Add(folderGuid);
-                }
+                folderGuids.Add(folderGuid);
             }
-
-            // Add folders that are allowed by RBAC
-            foreach (string folderId in timedState.RbacFolders)
-            {
-                if (Guid.TryParse(folderId, out Guid folderGuid))
-                {
-                    folderGuids.Add(folderGuid);
-                }
-            }
-
-            user.SetPreference(PreferenceKind.EnabledFolders, folderGuids.ToArray());
         }
+
+        // Add folders that are allowed by RBAC
+        foreach (string folderId in timedState.RbacFolders)
+        {
+            if (Guid.TryParse(folderId, out Guid folderGuid))
+            {
+                folderGuids.Add(folderGuid);
+            }
+        }
+
+        user.SetPreference(PreferenceKind.EnabledFolders, folderGuids.ToArray());
 
         user.SetPermission(PermissionKind.EnableLiveTvAccess,
             config.EnableLiveTvRoles ? timedState.EnableLiveTv : config.EnableLiveTv);

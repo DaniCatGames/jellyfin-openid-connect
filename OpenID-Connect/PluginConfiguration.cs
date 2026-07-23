@@ -67,9 +67,14 @@ public class Config
     public string AvatarClaim { get; set; }
 
     /// <summary>
-    ///     Gets or sets a value indicating whether RBAC is enabled.
+    ///     Gets or sets a value indicating whether the IdP will autoprovision users.
     /// </summary>
-    public bool EnableAuthorization { get; set; }
+    public bool EnableUserProvisioning { get; set; }
+
+    /// <summary>
+    ///     Gets or sets a value indicating whether the IdP will autoupdate users.
+    /// </summary>
+    public bool UpdateUsersOnLogin { get; set; }
 
     /// <summary>
     ///     Gets or sets what roles are checked to determine whether the user is allowed to use Jellyfin.
@@ -80,11 +85,6 @@ public class Config
     ///     Gets or sets the roles that are checked to determine whether the user is an administrator.
     /// </summary>
     public string[] AdminRoles { get; set; }
-
-    /// <summary>
-    ///     Gets or sets a value indicating whether the IdP will autoprovision users.
-    /// </summary>
-    public bool EnableUserProvisioning { get; set; }
 
     /// <summary>
     ///     Gets or sets the list of users that IdP users can be linked to.
