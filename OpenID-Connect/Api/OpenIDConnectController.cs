@@ -561,6 +561,7 @@ public class OpenIDConnectController(
             AppVersion = authResponse.AppVersion,
             DeviceId = authResponse.DeviceId,
             DeviceName = authResponse.DeviceName,
+            RemoteEndPoint = HttpContext.Connection.RemoteIpAddress?.ToString(),
         };
         logger.LogInformation("Auth request created...");
 
