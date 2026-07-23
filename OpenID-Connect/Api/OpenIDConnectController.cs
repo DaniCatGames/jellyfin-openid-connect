@@ -110,17 +110,8 @@ public class OpenIDConnectController(
             return Content(htmlOutput, "text/html");
         }
 
-        if (!config.EnableFolderRoles && config.EnabledFolders != null)
-        {
-            timedState.Folders = new List<string>(config.EnabledFolders);
-        }
-        else
-        {
-            timedState.Folders = [];
-        }
-
-        timedState.EnableLiveTv = config.EnableLiveTv;
-        timedState.EnableLiveTvManagement = config.EnableLiveTvManagement;
+        timedState.DefaultAllowedFolders = config.EnabledFolders != null ? [..config.EnabledFolders] : [];
+        timedState.RbacFolders = [];
 
         Claim avatarClaim = result.User.Claims.FirstOrDefault(claim =>
             claim.Type == (string.IsNullOrWhiteSpace(config.AvatarClaim) ? "picture" : config.AvatarClaim));
@@ -311,29 +302,24 @@ public class OpenIDConnectController(
             }
 
             // Get allowed folders from roles
-            if (config.EnableFolderRoles)
+            if (config.FolderRoleMapping is { Count: >= 1 })
             {
                 IEnumerable<string> folders = config.FolderRoleMapping
                     .Where(map => role.Equals(map.Role.Trim(), StringComparison.Ordinal))
                     .SelectMany(map => map.Folders ?? []);
-
-                timedState.Folders.AddRange(folders);
+                timedState.RbacFolders.AddRange(folders);
             }
 
-            if (config.EnableLiveTvRoles)
+            // Check if allowed Live TV based on roles
+            if (config.LiveTvRoles?.Contains(role) == true)
             {
-                // Check if allowed Live TV based on roles
-                if (config.LiveTvRoles?.Contains(role) == true)
-                {
-                    timedState.EnableLiveTv = true;
-                }
+                timedState.EnableLiveTv = true;
+            }
 
-
-                // Check if allowed Live TV management based on roles
-                if (config.LiveTvManagementRoles?.Contains(role) == true)
-                {
-                    timedState.EnableLiveTvManagement = true;
-                }
+            // Check if allowed Live TV management based on roles
+            if (config.LiveTvManagementRoles?.Contains(role) == true)
+            {
+                timedState.EnableLiveTvManagement = true;
             }
         }
     }
@@ -417,7 +403,7 @@ public class OpenIDConnectController(
             return Problem("State not found");
         }
 
-        if (!timedState.Valid || timedState.Created < DateTime.UtcNow.AddMinutes(-1))
+        if (!stateManager.IsValid(timedState))
         {
             return Problem("State is not valid.");
         }
@@ -430,16 +416,7 @@ public class OpenIDConnectController(
             return Unauthorized("User provisioning or linking with this user is disabled.");
         }
 
-        AuthenticationResult authenticationResult = await AuthenticateUser(
-                userId,
-                timedState.Admin,
-                config.EnableAuthorization,
-                config.EnableAllFolders,
-                timedState.Folders.ToArray(),
-                timedState.EnableLiveTv,
-                timedState.EnableLiveTvManagement,
-                response,
-                timedState.AvatarURL)
+        AuthenticationResult authenticationResult = await AuthenticateUser(userId, response, config, timedState)
             .ConfigureAwait(false);
 
         stateManager.TryRemove(response.Data, out _);
@@ -554,24 +531,14 @@ public class OpenIDConnectController(
     ///     Authenticates the user with the given information.
     /// </summary>
     /// <param name="userId">The user id of the user to authenticate.</param>
-    /// <param name="isAdmin">Determines whether this user is an administrator.</param>
-    /// <param name="enableAuthorization">Determines whether RBAC is used for this user.</param>
-    /// <param name="enableAllFolders">Determines whether all folders are enabled.</param>
-    /// <param name="enabledFolders">Determines which folders should be enabled for this client.</param>
-    /// <param name="enableLiveTv">Determines whether live TV access is allowed for this user.</param>
-    /// <param name="enableLiveTvAdmin">Determines whether live TV can be managed by this user.</param>
     /// <param name="authResponse">The client information to authenticate the user with.</param>
-    /// <param name="avatarUrl">The new avatar url for the user.</param>
+    /// <param name="config">The provider config.</param>
+    /// <param name="timedState">The state belonging to the flow.</param>
     private async Task<AuthenticationResult> AuthenticateUser(
         Guid userId,
-        bool isAdmin,
-        bool enableAuthorization,
-        bool enableAllFolders,
-        string[] enabledFolders,
-        bool enableLiveTv,
-        bool enableLiveTvAdmin,
         AuthResponse authResponse,
-        string avatarUrl)
+        Config config,
+        TimedAuthorizeState timedState)
     {
         User user = userManager.GetUserById(userId);
 
@@ -580,37 +547,7 @@ public class OpenIDConnectController(
             throw new Exception("User not found");
         }
 
-        if (enableAuthorization)
-        {
-            user.SetPermission(PermissionKind.IsAdministrator, isAdmin);
-            user.SetPermission(PermissionKind.EnableAllFolders, enableAllFolders);
-
-            if (!enableAllFolders)
-            {
-                // Folder IDs arrive as strings; EnabledFolders preference needs Guids. Parse once, dropping any
-                // unparseable entries.
-                var folderGuids = new List<Guid>(enabledFolders.Length);
-                foreach (string folderId in enabledFolders)
-                {
-                    if (Guid.TryParse(folderId, out Guid folderGuid))
-                    {
-                        folderGuids.Add(folderGuid);
-                    }
-                }
-
-                user.SetPreference(PreferenceKind.EnabledFolders, folderGuids.ToArray());
-            }
-        }
-
-        user.SetPermission(PermissionKind.EnableLiveTvAccess, enableLiveTv);
-        user.SetPermission(PermissionKind.EnableLiveTvManagement, enableLiveTvAdmin);
-
-        if (avatarUrl is not null)
-        {
-            await SetUserAvatar(avatarUrl, user).ConfigureAwait(false);
-        }
-
-        await userManager.UpdateUserAsync(user).ConfigureAwait(false);
+        await UpdateUser(config, timedState, user).ConfigureAwait(false);
 
         var authRequest = new AuthenticationRequest
         {
@@ -624,6 +561,53 @@ public class OpenIDConnectController(
         logger.LogInformation("Auth request created...");
 
         return await sessionManager.AuthenticateDirect(authRequest).ConfigureAwait(false);
+    }
+
+    private async Task UpdateUser(
+        Config config,
+        TimedAuthorizeState timedState,
+        User user)
+    {
+        if (config.EnableAuthorization)
+        {
+            user.SetPermission(PermissionKind.IsAdministrator, timedState.Admin);
+            user.SetPermission(PermissionKind.EnableAllFolders, config.EnableAllFolders);
+
+            // Parse folder IDs to GUIDs
+            var folderGuids = new List<Guid>(timedState.DefaultAllowedFolders.Count + timedState.RbacFolders.Count);
+
+            // Add folders that are allowed by default
+            foreach (string folderId in timedState.DefaultAllowedFolders)
+            {
+                if (Guid.TryParse(folderId, out Guid folderGuid))
+                {
+                    folderGuids.Add(folderGuid);
+                }
+            }
+
+            // Add folders that are allowed by RBAC
+            foreach (string folderId in timedState.RbacFolders)
+            {
+                if (Guid.TryParse(folderId, out Guid folderGuid))
+                {
+                    folderGuids.Add(folderGuid);
+                }
+            }
+
+            user.SetPreference(PreferenceKind.EnabledFolders, folderGuids.ToArray());
+        }
+
+        user.SetPermission(PermissionKind.EnableLiveTvAccess,
+            config.EnableLiveTvRoles ? timedState.EnableLiveTv : config.EnableLiveTv);
+        user.SetPermission(PermissionKind.EnableLiveTvManagement,
+            config.EnableLiveTvRoles ? timedState.EnableLiveTvManagement : config.EnableLiveTvManagement);
+
+        if (timedState.AvatarURL is not null)
+        {
+            await SetUserAvatar(timedState.AvatarURL, user).ConfigureAwait(false);
+        }
+
+        await userManager.UpdateUserAsync(user).ConfigureAwait(false);
     }
 
     private async Task SetUserAvatar(string avatarUrl, User user)

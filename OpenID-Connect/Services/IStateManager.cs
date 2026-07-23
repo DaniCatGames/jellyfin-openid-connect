@@ -110,7 +110,12 @@ public class TimedAuthorizeState(AuthorizeState state, DateTime created)
     /// <summary>
     ///     Gets or sets the folders the user is allowed access to.
     /// </summary>
-    public List<string> Folders { get; set; }
+    public List<string> DefaultAllowedFolders { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the folders the user is allowed access to.
+    /// </summary>
+    public List<string> RbacFolders { get; set; }
 
     /// <summary>
     ///     Gets or sets a value indicating whether the user is allowed to view live TV.
