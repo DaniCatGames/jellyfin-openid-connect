@@ -33,8 +33,8 @@
     <ItemGroup>
         <FrameworkReference Include="Microsoft.AspNetCore.App"/>
         <PackageReference Include="Duende.IdentityModel.OidcClient" Version="7.1.0"/>
-        <PackageReference Include="Jellyfin.Controller" Version="12.0.0-rc2"/>
-        <PackageReference Include="Jellyfin.Model" Version="12.0.0-rc2"/>
+        <PackageReference Include="Jellyfin.Controller" Version="12.0.0-rcrc3"/>
+        <PackageReference Include="Jellyfin.Model" Version="12.0.0-rcrc3"/>
         <PackageReference Include="Newtonsoft.Json" Version="13.0.4"/>
     </ItemGroup>
 
