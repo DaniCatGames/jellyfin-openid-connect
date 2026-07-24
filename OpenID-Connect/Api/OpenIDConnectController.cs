@@ -110,28 +110,20 @@ public class OpenIDConnectController(
             timedState.AvatarURL = uri.ToString();
         }
 
-        foreach (Claim claim in result.User.Claims)
+        // Role processing
+        // The regex matches any "." not preceded by a "\": a.b.c will be split into a, b, and c, but a.b\.c will be split into a, b.c (after processing the escaped dots)
+        // We have to first process the RoleClaim string
+        string[] segments = string.IsNullOrEmpty(config.RoleClaim.Trim())
+            ? ["groups"]
+            : Regex.Split(config.RoleClaim.Trim(), @"(?<!\\)\.");
+
+        // Now we make sure that any escaped "."s ("\.") are replaced with "."
+        segments = segments.Select(i => i.Replace("\\.", ".")).ToArray();
+
+        Claim roleClaim = result.User.Claims.FirstOrDefault(claim => claim.Type == segments[0]);
+        if (roleClaim != null)
         {
-            // Role processing
-            // The regex matches any "." not preceded by a "\": a.b.c will be split into a, b, and c, but a.b\.c will be split into a, b.c (after processing the escaped dots)
-            // We have to first process the RoleClaim string
-            string[] segments = string.IsNullOrEmpty(config.RoleClaim)
-                ? ["groups"]
-                : Regex.Split(config.RoleClaim.Trim(), @"(?<!\\)\.");
-
-            if (segments.Length == 0 || segments[0] == "")
-            {
-                continue;
-            }
-
-            // Now we make sure that any escaped "."s ("\.") are replaced with "."
-            segments = segments.Select(i => i.Replace("\\.", ".")).ToArray();
-
-            // if current claim is configured role claim, process roles
-            if (claim.Type == segments[0])
-            {
-                ProcessRoles(segments, claim, config, timedState);
-            }
+            ProcessRoles(segments, roleClaim, config, timedState);
         }
 
         Claim subClaim = result.User.Claims.FirstOrDefault(claim => claim.Type == "sub");
