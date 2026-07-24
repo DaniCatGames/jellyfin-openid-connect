@@ -66,7 +66,7 @@ public class LinkController(
             return Problem("State not found");
         }
 
-        if (!stateManager.IsValid(timedState))
+        if (!timedState.IsValid())
         {
             return Problem("State is not valid");
         }
