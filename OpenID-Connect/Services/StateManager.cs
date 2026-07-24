@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
@@ -30,18 +29,6 @@ public class StateManager : IStateManager
     }
 
     /// <inheritdoc />
-    public bool IsValid(TimedAuthorizeState state)
-    {
-        return state.Valid && !IsExpired(state);
-    }
-
-    /// <inheritdoc />
-    public bool IsExpired(TimedAuthorizeState state)
-    {
-        return state.Created < DateTime.UtcNow.AddMinutes(-1);
-    }
-
-    /// <inheritdoc />
     public ConcurrentDictionary<string, TimedAuthorizeState> GetStates()
     {
         return _states;
@@ -50,9 +37,7 @@ public class StateManager : IStateManager
     /// <inheritdoc />
     public void Invalidate()
     {
-        DateTime cutoff = DateTime.UtcNow.AddMinutes(-1);
-
-        foreach (KeyValuePair<string, TimedAuthorizeState> kvp in _states.Where(kvp => kvp.Value.Created < cutoff))
+        foreach (KeyValuePair<string, TimedAuthorizeState> kvp in _states.Where(kvp => kvp.Value.IsExpired()))
         {
             _states.TryRemove(kvp);
         }

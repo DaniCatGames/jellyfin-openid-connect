@@ -35,20 +35,6 @@ public interface IStateManager
     bool TryRemove(string key, out TimedAuthorizeState state);
 
     /// <summary>
-    ///     Check if a state is still valid.
-    /// </summary>
-    /// <param name="state">The state to check.</param>
-    /// <returns></returns>
-    bool IsValid(TimedAuthorizeState state);
-
-    /// <summary>
-    ///     Check if a state is expired.
-    /// </summary>
-    /// <param name="state">The state to check.</param>
-    /// <returns></returns>
-    bool IsExpired(TimedAuthorizeState state);
-
-    /// <summary>
     ///     Get all currently running states and states that haven't been removed by Invalidate() yet.
     /// </summary>
     /// <returns>the states</returns>
@@ -131,4 +117,20 @@ public class TimedAuthorizeState(AuthorizeState state, DateTime created)
     ///     Gets or sets the user avatar url.
     /// </summary>
     public string AvatarURL { get; set; }
+
+    /// <summary>
+    ///     Check if a state is still valid.
+    /// </summary>
+    public bool IsValid()
+    {
+        return Valid && !IsExpired();
+    }
+
+    /// <summary>
+    ///     Check if a state is expired.
+    /// </summary>
+    public bool IsExpired()
+    {
+        return Created < DateTime.UtcNow.AddMinutes(-1);
+    }
 }

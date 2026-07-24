@@ -31,7 +31,6 @@ namespace Jellyfin.Plugin.OpenIDConnect.Api;
 /// <param name="userManager">Instance of the <see cref="IUserManager" /> interface.</param>
 /// <param name="httpClientFactory">Instance of the <see cref="IHttpClientFactory" /> interface.</param>
 /// <param name="stateManager">Instance of the <see cref="IStateManager" /> interface.</param>
-/// <param name="linkManager">Instance of the <see cref="ILinkManager" /> interface.</param>
 [ApiController]
 [Route("[controller]")]
 public class OpenIDConnectController(
@@ -69,7 +68,7 @@ public class OpenIDConnectController(
         }
 
         if (!stateManager.TryGetValue(state, out TimedAuthorizeState timedState)
-            || stateManager.IsExpired(timedState))
+            || timedState.IsExpired())
         {
             return BadRequest("Invalid or expired state");
         }
@@ -391,9 +390,9 @@ public class OpenIDConnectController(
             return Problem("State not found");
         }
 
-        if (!stateManager.IsValid(timedState))
+        if (!timedState.IsValid())
         {
-            return Problem("State is not valid.");
+            return Problem("State is not valid or expired.");
         }
 
         Guid userId = await oidcUserManager.GetOrCreateUser(provider, timedState, config);
@@ -430,7 +429,7 @@ public class OpenIDConnectController(
         {
             return NotFound("User not found");
         }
-        
+
         await oidcUserManager.UnregisterUser(user, provider).ConfigureAwait(false);
 
         return Ok();
