@@ -430,6 +430,21 @@ const oidcConfigurationPage = {
                 .filter((cb) => cb.checked)
                 .map((cb) => cb.getAttribute("data-username"));
 
+            if (current_config["Endpoint"] === null || current_config["Endpoint"].trim() === "") {
+                Dashboard.alert("Endpoint cannot be empty.");
+                return;
+            }
+
+            if (current_config["ClientId"] === null || current_config["ClientId"].trim() === "") {
+                Dashboard.alert("Client ID cannot be empty.");
+                return;
+            }
+
+            if (current_config["Secret"] === null || current_config["Secret"].trim() === "") {
+                Dashboard.alert("Secret cannot be empty.");
+                return;
+            }
+
             config.Configs[provider_name] = current_config;
 
             ApiClient.updatePluginConfiguration(oidcConfigurationPage.pluginUniqueId, config).then((result) => {
