@@ -73,11 +73,7 @@ public class OpenIDConnectController(
             return BadRequest("Invalid or expired state");
         }
 
-        OidcClient oidcClient = CreateClient(provider, config, out ActionResult configError);
-        if (configError != null)
-        {
-            return configError;
-        }
+        OidcClient oidcClient = CreateClient(provider, config);
 
         AuthorizeState currentState = timedState.State;
         LoginResult result = await oidcClient.ProcessResponseAsync(Request.QueryString.Value, currentState)
@@ -165,37 +161,14 @@ public class OpenIDConnectController(
             MediaTypeNames.Text.Html);
     }
 
-    private OidcClient CreateClient(string provider, Config config, out ActionResult configError)
+    private OidcClient CreateClient(string provider, Config config)
     {
-        string endpoint = config.Endpoint.Trim();
-        if (string.IsNullOrEmpty(endpoint))
-        {
-            configError = BadRequest("No IdP endpoint configured for provider");
-            return null;
-        }
-
-        string clientId = config.ClientId.Trim();
-        if (string.IsNullOrEmpty(clientId))
-        {
-            configError = BadRequest("No client ID configured for provider");
-            return null;
-        }
-
-        string clientSecret = config.Secret.Trim();
-        if (string.IsNullOrEmpty(clientSecret))
-        {
-            configError = BadRequest("No client secret configured for provider");
-            return null;
-        }
-
-        configError = null;
-
         string[] scopes = config.Scopes ?? new string[2];
         var options = new OidcClientOptions
         {
-            Authority = endpoint,
-            ClientId = clientId,
-            ClientSecret = clientSecret,
+            Authority = config.Endpoint,
+            ClientId = config.ClientId,
+            ClientSecret = config.Secret,
             RedirectUri = GetRequestBase(config.UseHTTP, config.PortOverride)
                           + $"/OpenIDConnect/redirect/{provider}",
             Scope = string.Join(" ", scopes.Prepend("openid profile")),
@@ -216,7 +189,7 @@ public class OpenIDConnectController(
             {
                 Discovery =
                 {
-                    AdditionalEndpointBaseAddresses = { new Uri(endpoint).GetLeftPart(UriPartial.Authority) },
+                    AdditionalEndpointBaseAddresses = { new Uri(config.Endpoint).GetLeftPart(UriPartial.Authority) },
                     ValidateEndpoints = !config.DoNotValidateEndpoints,
                     RequireHttps = !config.DisableHttps,
                     ValidateIssuerName = !config.DoNotValidateIssuerName,
@@ -324,11 +297,7 @@ public class OpenIDConnectController(
             throw new ArgumentException("Provider does not exist");
         }
 
-        OidcClient oidcClient = CreateClient(provider, config, out ActionResult configError);
-        if (configError != null)
-        {
-            return configError;
-        }
+        OidcClient oidcClient = CreateClient(provider, config);
 
         AuthorizeState state = await oidcClient.PrepareLoginAsync().ConfigureAwait(false);
 
