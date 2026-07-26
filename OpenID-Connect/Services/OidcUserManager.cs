@@ -92,7 +92,12 @@ public class OidcUserManager(
         }
 
         logger.LogInformation("OIDC user {Username} doesn't exist, creating...", timedState.Username);
-        user = await CreateUserAndLink(provider, timedState.Sub, timedState.Username).ConfigureAwait(false);
+
+        string authProvider = string.IsNullOrWhiteSpace(config.DefaultAuthProvider)
+            ? "Jellyfin.Plugin.OpenIDConnect.AuthProvider"
+            : config.DefaultAuthProvider;
+        user = await CreateUserAndLink(provider, timedState.Sub, timedState.Username, authProvider)
+            .ConfigureAwait(false);
         await UpdateUser(config, timedState, user).ConfigureAwait(false);
         return user.Id;
     }
@@ -141,14 +146,14 @@ public class OidcUserManager(
         linkManager.DeleteLinksToUser(user.Id);
     }
 
-    private async Task<User> CreateUserAndLink(string provider, string sub, string username)
+    private async Task<User> CreateUserAndLink(string provider, string sub, string username, string authProvider)
     {
         User user = await userManager.CreateUserAsync(username).ConfigureAwait(false);
 
         user.SetPermission(PermissionKind.EnableAllFolders, false);
         user.SetPreference(PreferenceKind.EnabledFolders, []);
 
-        user.AuthenticationProviderId = "Jellyfin.Plugin.OpenIDConnect.AuthProvider";
+        user.AuthenticationProviderId = authProvider;
         await userManager.UpdateUserAsync(user).ConfigureAwait(false);
 
         linkManager.TryCreateLink(provider, sub, user.Id);

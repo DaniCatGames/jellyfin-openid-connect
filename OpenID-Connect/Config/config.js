@@ -134,7 +134,6 @@ const oidcConfigurationPage = {
 
         oidcConfigurationPage.updateLibraryAccessVisibility(page);
         oidcConfigurationPage.updateLiveTvVisibility(page);
-        oidcConfigurationPage.updateUserAccessVisibility(page);
     },
 
     populateEnabledFolders: (folder_list, container) => {
@@ -313,16 +312,6 @@ const oidcConfigurationPage = {
         }
     },
 
-    updateUserAccessVisibility: (page) => {
-        const enableAuth = page.querySelector("#EnableAuthorization").checked;
-
-        const rolesContainer = page.querySelector("#Container-Roles");
-        const adminRolesContainer = page.querySelector("#Container-AdminRoles");
-
-        rolesContainer.style.display = enableAuth ? "block" : "none";
-        adminRolesContainer.style.display = enableAuth ? "block" : "none";
-    },
-
     loadProvider: (page, provider_name) => {
         ApiClient.getPluginConfiguration(oidcConfigurationPage.pluginUniqueId).then((config) => {
             const provider = config.Configs[provider_name] || {};
@@ -361,7 +350,6 @@ const oidcConfigurationPage = {
 
             oidcConfigurationPage.updateLiveTvVisibility(page);
             oidcConfigurationPage.updateLibraryAccessVisibility(page);
-            oidcConfigurationPage.updateUserAccessVisibility(page);
         });
     },
 
@@ -580,9 +568,5 @@ export default function (view) {
 
     view.querySelector("#EnableLiveTvManagement").addEventListener("change", () => {
         oidcConfigurationPage.updateLiveTvVisibility(view);
-    });
-
-    view.querySelector("#EnableAuthorization").addEventListener("change", () => {
-        oidcConfigurationPage.updateUserAccessVisibility(view);
     });
 }

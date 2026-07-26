@@ -144,6 +144,11 @@ public class Config
     public string[] Scopes { get; set; }
 
     /// <summary>
+    ///     Gets or Sets which authentication to use when creating new users.
+    /// </summary>
+    public string DefaultAuthProvider { get; set; }
+
+    /// <summary>
     ///     Gets or sets a value indicating whether HTTPS in the discovery endpoint is required.
     /// </summary>
     public bool DisableHttps { get; set; }

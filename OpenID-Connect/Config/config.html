@@ -392,6 +392,38 @@
                                     listed here.
                                 </div>
                             </div>
+
+                            <div class="inputContainer">
+                                <label class="inputLabel inputLabelUnfocused" for="DefaultAuthProvider">Override
+                                    Authentication Provider</label>
+                                <input class="oidc-text" id="DefaultAuthProvider" is="emby-input"
+                                       placeholder="Jellyfin.Plugin.OpenIDConnect.AuthProvider"
+                                       type="text"/>
+                                <div class="fieldDescription">
+                                    Overrides the authorization provider to use for users created by OIDC (not linked!),
+                                    the default provider only allows login via an IDP. Users created by OIDC do not have
+                                    a password set, so ensure that the selected provider has custom password checking
+                                    functionality (eg LDAP), or ensure users created by OIDC have jellyfin passwords set
+                                    if using the default authentication provider.
+                                </div>
+                            </div>
+
+                            <div class="checkboxContainer">
+                                <label>
+                                    <input class="oidc-toggle" id="UseHTTP" is="emby-checkbox" name="UseHTTP"
+                                           type="checkbox"/>
+                                    <span>Use HTTP in redirects instead of HTTPS.</span>
+                                </label>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription">
+                                <label class="inputLabel inputLabelUnfocused" for="PortOverride">Port Override</label>
+                                <input class="oidc-text" id="PortOverride" is="emby-input" placeholder="443"
+                                       type="text"/>
+                                <div class="fieldDescription">
+                                    If the plugin redirects to the wrong port, override it here.
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -443,23 +475,6 @@
                                     <span>Skip Profile Loading (May be needed for Cloudflare)</span>
                                 </label>
                             </div>
-
-                            <div class="checkboxContainer">
-                                <label>
-                                    <input class="oidc-toggle" id="UseHTTP" is="emby-checkbox" name="UseHTTP"
-                                           type="checkbox"/>
-                                    <span>Use http in redirects instead of https.</span>
-                                </label>
-                            </div>
-
-                            <div class="checkboxContainer checkboxContainer-withDescription">
-                                <label class="inputLabel inputLabelUnfocused" for="PortOverride">Port Override</label>
-                                <input class="oidc-text" id="PortOverride" is="emby-input" placeholder="443"
-                                       type="text"/>
-                                <div class="fieldDescription">
-                                    If the plugin redirects to the wrong port, override it here.
-                                </div>
-                            </div>
                         </div>
                     </div>
 
@@ -469,12 +484,14 @@
                             <span class="material-icons" style="vertical-align: middle; font-size: 1.2em;">save</span>
                             Save Provider
                         </button>
+
                         <button class="raised button-submit emby-button" id="TestProvider" is="emby-button"
                                 type="button">
                             <span class="material-icons"
                                   style="vertical-align: middle; font-size: 1.2em;">fact_check</span>
                             Test Provider
                         </button>
+
                         <button class="raised button-delete emby-button" id="DeleteProvider" is="emby-button"
                                 type="button">
                             <span class="material-icons" style="vertical-align: middle; font-size: 1.2em;">delete</span>
