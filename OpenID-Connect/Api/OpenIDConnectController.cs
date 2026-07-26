@@ -93,7 +93,7 @@ public class OpenIDConnectController(
             return Content(htmlOutput, "text/html");
         }
 
-        timedState.DefaultAllowedFolders = config.EnabledFolders != null ? [..config.EnabledFolders] : [];
+        timedState.DefaultAllowedFolders = [.. config.EnabledFolders ?? []];
         timedState.RbacFolders = [];
 
         Claim avatarClaim = result.User.Claims.FirstOrDefault(claim =>
@@ -126,7 +126,7 @@ public class OpenIDConnectController(
         if (subClaim != null)
         {
             timedState.Sub = subClaim.Value;
-            if (config.Roles == null || config.Roles.Length == 0)
+            if (config.Roles is not { Length: > 0 })
             {
                 timedState.Valid = true;
             }
@@ -139,7 +139,7 @@ public class OpenIDConnectController(
 
         Claim usernameClaim = result.User.Claims.FirstOrDefault(claim =>
             claim.Type == (config.DefaultUsernameClaim?.Trim() ?? "preferred_username"));
-        timedState.Username = usernameClaim != null ? usernameClaim.Value : timedState.Sub;
+        timedState.Username = usernameClaim?.Value ?? timedState.Sub;
 
         if (!timedState.Valid)
         {
@@ -152,12 +152,11 @@ public class OpenIDConnectController(
             return Unauthorized("Error. Check permissions.");
         }
 
-        bool isLinking = timedState.IsLinking;
-        logger.LogInformation($"Is request linking: {isLinking}");
+        logger.LogInformation("Is request linking: {IsLinking}", timedState.IsLinking);
         return Content(WebResponse.Generator(state,
                 provider,
                 GetRequestBase(config.UseHTTP, config.PortOverride),
-                isLinking),
+                timedState.IsLinking),
             MediaTypeNames.Text.Html);
     }
 
@@ -239,12 +238,12 @@ public class OpenIDConnectController(
 
         timedState.Valid = roles.Any(role => config.Roles?.Contains(role) == true)
                            || roles.Any(role => config.AdminRoles?.Contains(role) == true);
-        
+
         timedState.Admin = roles.Any(role => config.AdminRoles?.Contains(role) == true);
-        
+
         timedState.EnableLiveTv = roles.Any(role => config.LiveTvRoles?.Contains(role) == true);
         timedState.EnableLiveTvManagement = roles.Any(role => config.LiveTvManagementRoles?.Contains(role) == true);
-        
+
         // Get allowed folders from roles
         if (config.FolderRoleMapping is { Count: >= 1 })
         {
@@ -273,7 +272,7 @@ public class OpenIDConnectController(
         if (!OpenIDConnect.Instance.Configuration.Configs.TryGetValue(provider, out Config config)
             || !config.Enabled)
         {
-            throw new ArgumentException("Provider does not exist");
+            return BadRequest("Provider does not exist");
         }
 
         OidcClient oidcClient = CreateClient(provider, config);
@@ -379,8 +378,7 @@ public class OpenIDConnectController(
     {
         int requestPort = portOverride ?? Request.Host.Port ?? -1;
 
-        if (requestPort == 80 && string.Equals(Request.Scheme, "http", StringComparison.OrdinalIgnoreCase)
-            || requestPort == 443 && string.Equals(Request.Scheme, "https", StringComparison.OrdinalIgnoreCase))
+        if ((requestPort, Request.Scheme) is (80, "http") or (443, "https"))
         {
             requestPort = -1;
         }

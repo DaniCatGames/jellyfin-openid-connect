@@ -59,7 +59,7 @@ public class TimedAuthorizeState(AuthorizeState state, DateTime created)
     /// <summary>
     ///     Gets or sets when this object was created to time it out.
     /// </summary>
-    public DateTime Created { get; } = created;
+    private DateTime Created { get; } = created;
 
     /// <summary>
     ///     Gets or sets a value indicating whether the user is valid.

@@ -54,12 +54,12 @@ public class OpenIDConnect : BasePlugin<PluginConfiguration>, IPlugin, IHasWebPa
     }
 
     /// <summary>
-    ///     Gets the name of the SSO plugin.
+    ///     Gets the name of the plugin.
     /// </summary>
     public override string Name => "OpenID Connect";
 
     /// <summary>
-    ///     Gets the GUID of the SSO plugin.
+    ///     Gets the GUID of the plugin.
     /// </summary>
     public override Guid Id => Guid.Parse("3b621017-67a3-461e-a820-21622c591827");
 
