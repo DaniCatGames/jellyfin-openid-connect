@@ -217,9 +217,9 @@ public class OpenIDConnectController(
         {
             try
             {
-                JToken currentToken = JToken.Parse(claim.Value);
-
-                for (int i = 1; i < segments.Length; i++) currentToken = currentToken?[segments[i]];
+                JToken currentToken = segments
+                    .Skip(1)
+                    .Aggregate(JToken.Parse(claim.Value), (current, segment) => current[segment]);
 
                 if (currentToken is JArray rolesArray)
                 {
@@ -237,42 +237,21 @@ public class OpenIDConnectController(
             }
         }
 
-        foreach (string role in roles)
+        timedState.Valid = roles.Any(role => config.Roles?.Contains(role) == true)
+                           || roles.Any(role => config.AdminRoles?.Contains(role) == true);
+        
+        timedState.Admin = roles.Any(role => config.AdminRoles?.Contains(role) == true);
+        
+        timedState.EnableLiveTv = roles.Any(role => config.LiveTvRoles?.Contains(role) == true);
+        timedState.EnableLiveTvManagement = roles.Any(role => config.LiveTvManagementRoles?.Contains(role) == true);
+        
+        // Get allowed folders from roles
+        if (config.FolderRoleMapping is { Count: >= 1 })
         {
-            // Check if allowed to login based on roles
-            if (config.Roles?.Contains(role) == true)
-            {
-                timedState.Valid = true;
-            }
-
-            // Check if admin based on roles
-            if (config.AdminRoles?.Contains(role) == true)
-            {
-                timedState.Admin = true;
-                // Also allow login (as the user is an admin)
-                timedState.Valid = true;
-            }
-
-            // Get allowed folders from roles
-            if (config.FolderRoleMapping is { Count: >= 1 })
-            {
-                IEnumerable<string> folders = config.FolderRoleMapping
-                    .Where(map => role.Equals(map.Role.Trim(), StringComparison.Ordinal))
-                    .SelectMany(map => map.Folders ?? []);
-                timedState.RbacFolders.AddRange(folders);
-            }
-
-            // Check if allowed Live TV based on roles
-            if (config.LiveTvRoles?.Contains(role) == true)
-            {
-                timedState.EnableLiveTv = true;
-            }
-
-            // Check if allowed Live TV management based on roles
-            if (config.LiveTvManagementRoles?.Contains(role) == true)
-            {
-                timedState.EnableLiveTvManagement = true;
-            }
+            IEnumerable<string> folders = config.FolderRoleMapping
+                .Where(map => roles.Any(role => role.Equals(map.Role.Trim(), StringComparison.Ordinal)))
+                .SelectMany(map => map.Folders ?? []);
+            timedState.RbacFolders.AddRange(folders);
         }
     }
 

@@ -76,19 +76,15 @@ public class LinkManager : ILinkManager
     /// <inheritdoc />
     public SerializableDictionary<string, IEnumerable<string>> GetLinksByUser(Guid userId)
     {
-        var mappings = new SerializableDictionary<string, IEnumerable<string>>();
         SerializableDictionary<string, Config> providerList = OpenIDConnect.Instance.Configuration.Configs;
+        Dictionary<string, IEnumerable<string>> mappings = providerList
+            .ToDictionary(
+                provider => provider.Key,
+                provider => provider.Value.Links
+                    .Where(link => link.Value == userId)
+                    .Select(link => link.Key));
 
-        foreach (string providerName in providerList.Keys)
-        {
-            SerializableDictionary<string, Guid> links = providerList[providerName].Links;
-            IEnumerable<string> keys = links
-                .Where(link => link.Value == userId)
-                .Select(link => link.Key);
-            mappings[providerName] = keys;
-        }
-
-        return mappings;
+        return new SerializableDictionary<string, IEnumerable<string>>(mappings);
     }
 
     /// <inheritdoc />

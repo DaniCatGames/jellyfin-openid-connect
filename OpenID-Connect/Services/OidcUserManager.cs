@@ -163,28 +163,13 @@ public class OidcUserManager(
         user.SetPermission(PermissionKind.IsAdministrator, timedState.Admin);
         user.SetPermission(PermissionKind.EnableAllFolders, config.EnableAllFolders);
 
-        // Parse folder IDs to GUIDs
-        var folderGuids = new List<Guid>(timedState.DefaultAllowedFolders.Count + timedState.RbacFolders.Count);
+        Guid[] folders = timedState.DefaultAllowedFolders
+            .Concat(timedState.RbacFolders)
+            .Select(guid => Guid.TryParse(guid, out Guid folderGuid) ? (Guid?)folderGuid : null)
+            .OfType<Guid>()
+            .ToArray();
 
-        // Add folders that are allowed by default
-        foreach (string folderId in timedState.DefaultAllowedFolders)
-        {
-            if (Guid.TryParse(folderId, out Guid folderGuid))
-            {
-                folderGuids.Add(folderGuid);
-            }
-        }
-
-        // Add folders that are allowed by RBAC
-        foreach (string folderId in timedState.RbacFolders)
-        {
-            if (Guid.TryParse(folderId, out Guid folderGuid))
-            {
-                folderGuids.Add(folderGuid);
-            }
-        }
-
-        user.SetPreference(PreferenceKind.EnabledFolders, folderGuids.ToArray());
+        user.SetPreference(PreferenceKind.EnabledFolders, folders);
 
         user.SetPermission(PermissionKind.EnableLiveTvAccess,
             config.EnableLiveTvRoles ? timedState.EnableLiveTv : config.EnableLiveTv);
@@ -218,13 +203,11 @@ public class OidcUserManager(
                 throw new Exception("Cannot get avatar image: " + avatarUrl);
             }
 
-            if (!avatarResponse.Content.Headers.TryGetValues("content-type",
-                    out IEnumerable<string> contentTypeList))
-            {
-                throw new Exception("Cannot get Content-Type of image : " + avatarUrl);
-            }
+            string contentType =
+                avatarResponse.Content.Headers.TryGetValues("content-type", out IEnumerable<string> contentTypeList)
+                    ? contentTypeList.First().ToLowerInvariant()
+                    : throw new Exception("Cannot get Content-Type of image: " + avatarUrl);
 
-            string contentType = contentTypeList.First().ToLowerInvariant();
             string extension = contentType switch
             {
                 "image/jpeg" or "image/jpg" => ".jpg",
