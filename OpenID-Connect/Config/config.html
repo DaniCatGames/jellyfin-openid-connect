@@ -109,7 +109,7 @@
                             <div class="inputContainer">
                                 <label class="inputLabel inputLabelUnfocused" for="Endpoint">OpenID Endpoint</label>
                                 <input class="oidc-text" id="Endpoint" is="emby-input"
-                                       placeholder="https://accounts.example.com" required=""
+                                       placeholder="https://auth.example.com" required=""
                                        type="text"/>
                                 <div class="fieldDescription">
                                     The OpenID endpoint. Must have a <code>.well-known</code> path available.
@@ -282,9 +282,7 @@
                                     Libraries</label>
                                 <div
                                     class="checkboxList paperList checkboxList-paperList oidc-folder-list oidc-bordered-list"
-                                    id="EnabledFolders"></div>
-                                <div class="fieldDescription">
-                                    Only applies when <strong>"Grant Access to All Libraries"</strong> is disabled.
+                                    id="EnabledFolders">
                                 </div>
                             </div>
 
@@ -311,8 +309,8 @@
                                 </label>
                                 <div class="oidc-role-map" id="FolderRoleMapping"></div>
                                 <div class="fieldDescription">
-                                    Map roles (from <strong>Role Claim</strong>) to libraries.
-                                    Only applies when <strong>Role-Based Library Access</strong> is enabled.
+                                    Map roles (from <strong>Role Claim</strong>) to libraries. Libraries enabled above
+                                    in "Enabled Libraries" are always accessible, regardless of RBAC mappings.
                                 </div>
                             </div>
                         </div>
@@ -325,22 +323,16 @@
                                 <label>
                                     <input class="oidc-toggle" id="EnableLiveTv" is="emby-checkbox" name="EnableLiveTv"
                                            type="checkbox"/>
-                                    <span>Grant Live TV Access by Default</span>
+                                    <span>Grant Live TV Access</span>
                                 </label>
-                                <div class="fieldDescription checkboxFieldDescription">
-                                    Still used even when Live TV RBAC is enabled.
-                                </div>
                             </div>
 
                             <div class="checkboxContainer checkboxContainer-withDescription">
                                 <label>
                                     <input class="oidc-toggle" id="EnableLiveTvManagement" is="emby-checkbox"
                                            name="EnableLiveTvManagement" type="checkbox"/>
-                                    <span>Grant Live TV Management by Default</span>
+                                    <span>Grant Live TV Management</span>
                                 </label>
-                                <div class="fieldDescription checkboxFieldDescription">
-                                    Still used even when Live TV RBAC is enabled.
-                                </div>
                             </div>
 
                             <div class="checkboxContainer checkboxContainer-withDescription"
@@ -351,7 +343,9 @@
                                     <span>Enable Live TV Role-Based Access</span>
                                 </label>
                                 <div class="fieldDescription checkboxFieldDescription">
-                                    Use roles to grant Live TV privileges.
+                                    Use roles to grant Live TV privileges. If <code>Grant Live TV Access</code> or
+                                    <code>Grant Live TV Management</code> are enabled, RBAC does not override those, and
+                                    permissions will be granted regardless of roles.
                                 </div>
                             </div>
 
@@ -359,7 +353,7 @@
                                 <label class="inputLabel inputLabelUnfocused" for="LiveTvRoles">Live TV Viewing
                                     Roles</label>
                                 <textarea class="oidc-line-list emby-textarea" id="LiveTvRoles" is="emby-textarea"
-                                          placeholder="live_tv_viewer"></textarea>
+                                          placeholder="live_tv_viewer&#10;live_tv_admin"></textarea>
                                 <div class="fieldDescription">
                                     One role per line. Users with any of these roles can view Live TV.
                                 </div>
@@ -371,7 +365,9 @@
                                 <textarea class="oidc-line-list emby-textarea" id="LiveTvManagementRoles"
                                           is="emby-textarea" placeholder="live_tv_admin"></textarea>
                                 <div class="fieldDescription">
-                                    One role per line. Users with any of these roles can manage Live TV.
+                                    One role per line. Users with any of these roles can manage Live TV. Access to Live
+                                    TV management does not automatically grant access to Live TV viewing, add roles to
+                                    both to enable both viewing and management.
                                 </div>
                             </div>
                         </div>
