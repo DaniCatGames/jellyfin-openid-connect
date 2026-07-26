@@ -109,7 +109,7 @@ public class OpenIDConnectController(
         // Role processing
         // The regex matches any "." not preceded by a "\": a.b.c will be split into a, b, and c, but a.b\.c will be split into a, b.c (after processing the escaped dots)
         // We have to first process the RoleClaim string
-        string[] segments = string.IsNullOrEmpty(config.RoleClaim.Trim())
+        string[] segments = string.IsNullOrEmpty(config.RoleClaim?.Trim())
             ? ["groups"]
             : Regex.Split(config.RoleClaim.Trim(), @"(?<!\\)\.");
 
