@@ -2,6 +2,7 @@ using Jellyfin.Data.Events.Users;
 using Jellyfin.Plugin.OpenIDConnect.Handlers;
 using Jellyfin.Plugin.OpenIDConnect.Services;
 using MediaBrowser.Controller;
+using MediaBrowser.Controller.Authentication;
 using MediaBrowser.Controller.Events;
 using MediaBrowser.Controller.Plugins;
 using Microsoft.Extensions.DependencyInjection;
@@ -18,5 +19,6 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
         serviceCollection.AddSingleton<ILinkManager, LinkManager>();
         serviceCollection.AddSingleton<IOidcUserManager, OidcUserManager>();
         serviceCollection.AddSingleton<IEventConsumer<UserDeletedEventArgs>, UserDeletedHandler>();
+        serviceCollection.AddSingleton<IAuthenticationProvider, AuthProvider>();
     }
 }
