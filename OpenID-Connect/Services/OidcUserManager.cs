@@ -32,20 +32,17 @@ public class OidcUserManager(
     /// <inheritdoc />
     public async Task<Guid> GetOrCreateUser(string provider, TimedAuthorizeState timedState, Config config)
     {
-        // Check if there is already a link for this sub, else get empty id
-        bool linkExists = linkManager.TryGetLink(provider, timedState.Sub, out Guid userId);
-        User user;
-
-        if (linkExists)
+        // if there is a link to the user, return linked id
+        if (linkManager.TryGetLink(provider, timedState.Sub, out Guid userId))
         {
-            user = userManager.GetUserById(userId);
-            if (user != null)
+            User linkedUser = userManager.GetUserById(userId);
+            if (linkedUser != null)
             {
                 logger.LogInformation("Found link to jellyfin user {username} from sub {sub} on IdP {provider}.",
-                    user.Username,
+                    linkedUser.Username,
                     timedState.Sub,
                     provider);
-                return user.Id;
+                return linkedUser.Id;
             }
 
             logger.LogWarning(
@@ -55,22 +52,34 @@ public class OidcUserManager(
             return Guid.Empty;
         }
 
+        string authProvider = string.IsNullOrWhiteSpace(config.DefaultAuthProvider)
+            ? "Jellyfin.Plugin.OpenIDConnect.AuthProvider"
+            : config.DefaultAuthProvider;
+
         // There is no link to this user yet.
         // Try to get user by username
-        user = userManager.GetUserByName(timedState.Username);
+        User existingUser = userManager.GetUserByName(timedState.Username);
 
-        if (user != null)
+        // if there is no match by username, create a new user
+        if (existingUser == null)
         {
-            // If a user is found with the same username, check if they can be linked, else stop and dont continue
-            if (config.AutoLinkingAllowList == null
-                || !config.AutoLinkingAllowList.Contains(timedState.Username, StringComparer.OrdinalIgnoreCase))
+            if (!config.EnableUserProvisioning)
             {
-                logger.LogWarning(
-                    "OIDC user {Username} already exists, but is not in the linking allowlist. Not linking user.",
-                    timedState.Username);
                 return Guid.Empty;
             }
 
+            logger.LogInformation("OIDC user {Username} doesn't exist, creating...", timedState.Username);
+
+            existingUser = await CreateUserAndLink(provider, timedState.Sub, timedState.Username, authProvider)
+                .ConfigureAwait(false);
+            await UpdateUser(config, timedState, existingUser).ConfigureAwait(false);
+            return existingUser.Id;
+        }
+
+        // if a user exists with a matching name, check allowlist
+        if (config.AutoLinkingAllowList != null
+            && config.AutoLinkingAllowList.Contains(timedState.Username, StringComparer.OrdinalIgnoreCase))
+        {
             config.AutoLinkingAllowList = config.AutoLinkingAllowList
                 .Where(u => !u.Equals(timedState.Username, StringComparison.OrdinalIgnoreCase))
                 .ToArray();
@@ -79,27 +88,42 @@ public class OidcUserManager(
             logger.LogInformation(
                 "OIDC user link doesn't exist, creating new link between sub {sub} and jellyfin user {username}.",
                 timedState.Sub,
-                user.Username);
-            linkManager.TryCreateLink(provider, timedState.Username, user.Id);
-            return user.Id;
+                existingUser.Username);
+            linkManager.TryCreateLink(provider, timedState.Username, existingUser.Id);
+            return existingUser.Id;
         }
 
+        // user exists but isnt in allowlist, so create a new one with an alt username
+        string newUsername = $"{timedState.Username} - {provider}";
+        User newUser = userManager.GetUserByName(newUsername);
 
-        // There is no jellyfin user with the same username at all, so create a new one, if provisioning is enabled
-        if (!config.EnableUserProvisioning)
+        if (newUser != null)
         {
-            return Guid.Empty;
+            // user with this format exists, try new format using sub (more ugly)
+            newUsername = timedState.Username == timedState.Sub
+                ? $"{timedState.Sub}"
+                : $"{timedState.Username} - {timedState.Sub}";
+            newUser = userManager.GetUserByName(newUsername);
+
+            if (newUser != null)
+            {
+                logger.LogWarning(
+                    "OIDC user {Username} already exists, and a users already exists with the username {Existing}. Not creating a new user.",
+                    timedState.Username,
+                    newUsername);
+                return Guid.Empty;
+            }
         }
 
-        logger.LogInformation("OIDC user {Username} doesn't exist, creating...", timedState.Username);
+        logger.LogInformation(
+            "OIDC user {Username} already exists, but is not in the linking allowlist. Creating a new user with name {NewName}.",
+            timedState.Username,
+            newUsername);
 
-        string authProvider = string.IsNullOrWhiteSpace(config.DefaultAuthProvider)
-            ? "Jellyfin.Plugin.OpenIDConnect.AuthProvider"
-            : config.DefaultAuthProvider;
-        user = await CreateUserAndLink(provider, timedState.Sub, timedState.Username, authProvider)
+        newUser = await CreateUserAndLink(provider, timedState.Sub, newUsername, authProvider)
             .ConfigureAwait(false);
-        await UpdateUser(config, timedState, user).ConfigureAwait(false);
-        return user.Id;
+        await UpdateUser(config, timedState, newUser).ConfigureAwait(false);
+        return newUser.Id;
     }
 
     /// <inheritdoc />
