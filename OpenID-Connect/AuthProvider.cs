@@ -33,7 +33,7 @@ public class AuthProvider : IAuthenticationProvider
     /// <summary>
     ///     Provider Name
     /// </summary>
-    public string Name => "Jellyfin.Plugin.OpenIDConnect.AuthProvider";
+    public string Name => "OpenID Connect";
 
     /// <summary>
     ///     Provider Status
