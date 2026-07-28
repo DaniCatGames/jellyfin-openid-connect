@@ -82,26 +82,32 @@ const oidcConfigurationPage = {
             list.appendChild(item);
         });
     },
-
     openEditor: (page, providerName) => {
         oidcConfigurationPage.showEditor(page);
 
         const titleDisplay = page.querySelector("#oidc-editor-provider-name-display");
         const modeBadge = page.querySelector("#oidc-editor-mode-badge");
 
+        const authSelect = page.querySelector("#DefaultAuthProvider");
+
         if (providerName) {
             modeBadge.textContent = "EDIT";
             modeBadge.className = "oidc-mode-badge oidc-mode-edit";
             titleDisplay.textContent = providerName;
-            oidcConfigurationPage.loadProvider(page, providerName);
+            // Populate dropdown first, then load the saved value
+            oidcConfigurationPage.populateAuthProviders(authSelect).then(() => {
+                oidcConfigurationPage.loadProvider(page, providerName);
+            });
         } else {
             modeBadge.textContent = "NEW";
             modeBadge.className = "oidc-mode-badge oidc-mode-new";
             titleDisplay.textContent = "New Provider";
-            oidcConfigurationPage.clearForm(page);
+            // Populate dropdown first, then clear form (so OIDC option exists to select)
+            oidcConfigurationPage.populateAuthProviders(authSelect).then(() => {
+                oidcConfigurationPage.clearForm(page);
+            });
         }
     },
-
     clearForm: (page) => {
         dirty = false;
 
@@ -117,6 +123,17 @@ const oidcConfigurationPage = {
 
         form.querySelectorAll(".oidc-toggle").forEach((checkbox) => {
             checkbox.checked = checkbox.id === "Enabled";
+        });
+
+        form.querySelectorAll(".oidc-select").forEach((select) => {
+            const oidcOption = [...select.options].find(
+                (o) => o.value === "Jellyfin.Plugin.OpenIDConnect.AuthProvider",
+            );
+            if (oidcOption) {
+                select.value = oidcOption.value;
+            } else if (select.options.length > 0) {
+                select.selectedIndex = 0;
+            }
         });
 
         const folderContainer = page.querySelector("#EnabledFolders");
@@ -244,6 +261,7 @@ const oidcConfigurationPage = {
         const toggle_class = ".oidc-toggle";
         const text_class = ".oidc-text";
         const text_list_class = ".oidc-line-list";
+        const select_class = ".oidc-select";
         const folder_list_fields = ["EnabledFolders"];
         const role_map_fields = ["FolderRoleMapping"];
 
@@ -252,8 +270,9 @@ const oidcConfigurationPage = {
         const text_fields = [...oidc_form.querySelectorAll(text_class)].map((e) => e.id);
         const text_list_fields = [...oidc_form.querySelectorAll(text_list_class)].map((e) => e.id);
         const check_fields = [...oidc_form.querySelectorAll(toggle_class)].map((e) => e.id);
+        const select_fields = [...oidc_form.querySelectorAll(select_class)].map((e) => e.id);
 
-        return { text_fields, text_list_fields, check_fields, folder_list_fields, role_map_fields };
+        return { text_fields, text_list_fields, check_fields, select_fields, folder_list_fields, role_map_fields };
     },
 
     fillTextList: (text_list, element) => {
@@ -325,6 +344,10 @@ const oidcConfigurationPage = {
 
             form_elements.text_list_fields.forEach((id) => {
                 if (provider[id]) oidcConfigurationPage.fillTextList(provider[id], page.querySelector("#" + id));
+            });
+
+            form_elements.select_fields.forEach((id) => {
+                if (provider[id]) page.querySelector("#" + id).value = provider[id];
             });
 
             form_elements.folder_list_fields.forEach((id) => {
@@ -403,6 +426,11 @@ const oidcConfigurationPage = {
                 current_config[id] = oidcConfigurationPage.parseTextList(page.querySelector("#" + id));
             });
 
+            form_elements.select_fields.forEach((id) => {
+                const value = page.querySelector("#" + id).value;
+                current_config[id] = value || null;
+            });
+
             form_elements.folder_list_fields.forEach((id) => {
                 const elem = page.querySelector(`#${id}`);
                 current_config[id] = oidcConfigurationPage.serializeEnabledFolders(elem);
@@ -460,6 +488,23 @@ const oidcConfigurationPage = {
                 <span>${user.Name}</span>
             `;
                 container.appendChild(label);
+            });
+        });
+    },
+
+    populateAuthProviders: (selectElement) => {
+        return ApiClient.ajax({
+            type: "GET",
+            url: ApiClient.getUrl("/OpenIDConnect/AuthProviders"),
+            dataType: "json",
+        }).then((providers) => {
+            selectElement.innerHTML = "";
+
+            providers.forEach((provider) => {
+                const option = document.createElement("option");
+                option.value = provider.Type;
+                option.textContent = provider.Name;
+                selectElement.appendChild(option);
             });
         });
     },

@@ -390,17 +390,17 @@
                             </div>
 
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="DefaultAuthProvider">Override
-                                    Authentication Provider</label>
-                                <input class="oidc-text" id="DefaultAuthProvider" is="emby-input"
-                                       placeholder="Jellyfin.Plugin.OpenIDConnect.AuthProvider"
-                                       type="text"/>
+                                <label class="inputLabel inputLabelUnfocused" for="DefaultAuthProvider">Authentication
+                                    Provider</label>
+                                <select class="oidc-select" id="DefaultAuthProvider" is="emby-select">
+                                    <!-- Options populated dynamically by JS -->
+                                </select>
                                 <div class="fieldDescription">
-                                    Overrides the authorization provider to use for users created by OIDC (not linked!),
-                                    the default provider only allows login via an IDP. Users created by OIDC do not have
+                                    Sets the authorization provider to use for users created by OIDC (not linked!),
+                                    the OIDC provider only allows login via an IdP. Users created by OIDC do not have
                                     a password set, so ensure that the selected provider has custom password checking
                                     functionality (eg LDAP), or ensure users created by OIDC have jellyfin passwords set
-                                    if using the default authentication provider.
+                                    if using the Default authentication provider.
                                 </div>
                             </div>
 
