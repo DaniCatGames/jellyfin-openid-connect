@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using MediaBrowser.Common.Api;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -21,6 +22,11 @@ public class ProviderController : ControllerBase
     [HttpPut("{provider}")]
     public ActionResult AddProvider(string provider, [FromBody] Config config)
     {
+        if (!Regex.IsMatch(provider, @"^[a-zA-Z0-9\-_]+$"))
+        {
+            return BadRequest("Provider name must only contain letters, numbers, dashes, and underscores.");
+        }
+
         if (config.Endpoint == null)
         {
             return BadRequest("Endpoint is required");

@@ -403,6 +403,12 @@ const oidcConfigurationPage = {
             return;
         }
 
+        const safeNameRegex = /^[a-zA-Z0-9\-_]+$/;
+        if (!safeNameRegex.test(provider_name)) {
+            Dashboard.alert("Provider name must only contain letters, numbers, dashes, and underscores.");
+            return;
+        }
+
         dirty = false;
 
         const form_elements = oidcConfigurationPage.listArgumentsByType(page);
