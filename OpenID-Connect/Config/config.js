@@ -96,6 +96,14 @@ const oidcConfigurationPage = {
             titleDisplay.textContent = providerName;
             // Populate dropdown first, then load the saved value
             oidcConfigurationPage.populateAuthProviders(authSelect).then(() => {
+                const oidcOption = [...authSelect.options].find(
+                    (o) => o.value === "Jellyfin.Plugin.OpenIDConnect.AuthProvider",
+                );
+                if (oidcOption) {
+                    authSelect.value = oidcOption.value;
+                } else if (authSelect.options.length > 0) {
+                    authSelect.selectedIndex = 0;
+                }
                 oidcConfigurationPage.loadProvider(page, providerName);
             });
         } else {
