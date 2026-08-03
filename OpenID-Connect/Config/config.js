@@ -521,6 +521,28 @@ export default function (view) {
     oidcConfigurationPage.loadConfiguration(view);
     oidcConfigurationPage.showDashboard(view);
 
+    view.querySelector("#oidc-migrate-btn").addEventListener("click", () => {
+        if (
+            !window.confirm(
+                "This will migrate settings from 9p4's SSO plugin. Current providers will be overriden they have the same name. Linked users and the avatar URL will not be migrated. Continue?",
+            )
+        ) {
+            return;
+        }
+
+        ApiClient.ajax({
+            type: "POST",
+            url: ApiClient.getUrl("OpenIDConnect/Providers/Migrate"),
+        })
+            .then((response) => {
+                Dashboard.alert("Migration successful.");
+                oidcConfigurationPage.loadConfiguration(view);
+            })
+            .catch((error) => {
+                Dashboard.alert("Migration failed or old configuration not found.");
+            });
+    });
+
     view.querySelector("#oidc-new-oidc-provider").addEventListener("input", () => {
         dirty = true;
     });

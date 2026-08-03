@@ -1,7 +1,14 @@
+using System.IO;
+using System.Linq;
 using System.Text.RegularExpressions;
+using System.Xml.Serialization;
+using MediaBrowser.Common;
 using MediaBrowser.Common.Api;
+using MediaBrowser.Common.Configuration;
+using MediaBrowser.Controller.Authentication;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.OpenIDConnect.Api;
 
@@ -10,7 +17,9 @@ namespace Jellyfin.Plugin.OpenIDConnect.Api;
 /// </summary>
 [ApiController]
 [Route("OpenIDConnect/Providers")]
-public class ProviderController : ControllerBase
+public class ProviderController(
+    ILogger<ProviderController> logger
+) : ControllerBase
 {
     /// <summary>
     ///     Adds an OpenID auth configuration. Requires administrator privileges. If the provider already exists,
@@ -90,5 +99,99 @@ public class ProviderController : ControllerBase
     public ActionResult GetProviderNames()
     {
         return Ok(OpenIDConnect.Instance.Configuration.Configs.Keys);
+    }
+
+    /// <summary>
+    ///     Migrates providers from the old provider config to the new one
+    /// </summary>
+    [Authorize(Policy = Policies.RequiresElevation)]
+    [HttpPost("Migrate")]
+    public ActionResult Migrate(
+        [FromServices] IApplicationPaths applicationPaths,
+        [FromServices] IApplicationHost applicationHost)
+    {
+        string oldPath = Path.Combine(applicationPaths.PluginConfigurationsPath, "SSO-Auth.xml");
+
+        if (!System.IO.File.Exists(oldPath))
+        {
+            return BadRequest("No old config to migrate from");
+        }
+
+        SsoAuthConfig oldConfig;
+        var serializer = new XmlSerializer(typeof(SsoAuthConfig));
+
+        try
+        {
+            using FileStream stream = System.IO.File.OpenRead(oldPath);
+            oldConfig = (SsoAuthConfig)serializer.Deserialize(stream);
+        }
+        catch
+        {
+            logger.LogError("Failed to parse config");
+            return StatusCode(500, "Failed to parse config");
+        }
+
+        if (oldConfig?.OidConfigs == null || oldConfig.OidConfigs.Count == 0)
+        {
+            return BadRequest("No configurations found in the old file to migrate.");
+        }
+
+        PluginConfiguration currentConfig = OpenIDConnect.Instance.Configuration;
+
+        foreach ((string name, SsoAuthProvider ssoAuthProvider) in oldConfig.OidConfigs)
+        {
+            string provider = null;
+            if (ssoAuthProvider.DefaultProvider is not null)
+            {
+                if (applicationHost.GetExports<IAuthenticationProvider>()
+                    .Select(p => p.GetType().FullName)
+                    .Where(p => p != "InvalidOrMissingAuthenticationProvider")
+                    .Any(p => p == ssoAuthProvider.DefaultProvider))
+                {
+                    provider = ssoAuthProvider.DefaultProvider;
+                }
+            }
+
+            var newConfig = new Config
+            {
+                Endpoint = ssoAuthProvider.OidEndpoint,
+                ClientId = ssoAuthProvider.OidClientId,
+                Secret = ssoAuthProvider.OidSecret,
+                Enabled = ssoAuthProvider.Enabled,
+                RoleClaim = ssoAuthProvider.RoleClaim,
+                DefaultUsernameClaim = ssoAuthProvider.DefaultUsernameClaim,
+                AvatarClaim = null,
+                EnableUserProvisioning = false,
+                UpdateUsersOnLogin = false,
+                Roles = ssoAuthProvider.Roles,
+                AdminRoles = ssoAuthProvider.AdminRoles,
+                AutoLinkingAllowList = [],
+                EnableAllFolders = ssoAuthProvider.EnableAllFolders,
+                EnabledFolders = ssoAuthProvider.EnabledFolders,
+                EnableFolderRoles = ssoAuthProvider.EnableFolderRoles,
+                FolderRoleMapping = ssoAuthProvider.FolderRoleMapping,
+                EnableLiveTv = ssoAuthProvider.EnableLiveTv,
+                EnableLiveTvManagement = ssoAuthProvider.EnableLiveTvManagement,
+                EnableLiveTvRoles = ssoAuthProvider.EnableLiveTvRoles,
+                LiveTvRoles = ssoAuthProvider.LiveTvRoles,
+                LiveTvManagementRoles = ssoAuthProvider.LiveTvManagementRoles,
+                Scopes = ssoAuthProvider.OidScopes,
+                DefaultAuthProvider = provider,
+                DisableHttps = ssoAuthProvider.DisableHttps,
+                DisablePushedAuthorization = ssoAuthProvider.DisablePushedAuthorization,
+                DoNotValidateEndpoints = ssoAuthProvider.DoNotValidateEndpoints,
+                DoNotValidateIssuerName = ssoAuthProvider.DoNotValidateIssuerName,
+                UseHTTP = ssoAuthProvider.SchemeOverride == "http",
+                DoNotLoadProfile = ssoAuthProvider.DoNotLoadProfile,
+                PortOverride = ssoAuthProvider.PortOverride,
+                Links = null,
+            };
+
+            currentConfig.Configs[name] = newConfig;
+        }
+
+        OpenIDConnect.Instance.UpdateConfiguration(currentConfig);
+
+        return Ok();
     }
 }
