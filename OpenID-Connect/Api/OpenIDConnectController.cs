@@ -116,10 +116,11 @@ public class OpenIDConnectController(
         // Now we make sure that any escaped "."s ("\.") are replaced with "."
         segments = segments.Select(i => i.Replace("\\.", ".")).ToArray();
 
-        Claim roleClaim = result.User.Claims.FirstOrDefault(claim => claim.Type == segments[0]);
-        if (roleClaim != null)
+        Claim[] roleClaims = [.. result.User.Claims.Where(claim => claim.Type == segments[0])];
+        
+        if (roleClaims.Length > 0)
         {
-            ProcessRoles(segments, roleClaim, config, timedState);
+            ProcessRoles(segments, roleClaims, config, timedState);
         }
 
         Claim subClaim = result.User.Claims.FirstOrDefault(claim => claim.Type == "sub");
@@ -202,37 +203,39 @@ public class OpenIDConnectController(
 
     private void ProcessRoles(
         string[] segments,
-        Claim claim,
+        IEnumerable<Claim> claims,
         Config config,
         TimedAuthorizeState timedState)
     {
-        List<string> roles;
-        if (segments.Length == 1)
+        List<string> roles = [];
+        foreach (Claim claim in claims)
         {
-            // If we are not using JSON values, just use the raw info from the claim value
-            roles = [claim.Value];
-        }
-        else
-        {
-            try
+            if (segments.Length == 1)
             {
-                JToken currentToken = segments
-                    .Skip(1)
-                    .Aggregate(JToken.Parse(claim.Value), (current, segment) => current[segment]);
-
-                if (currentToken is JArray rolesArray)
-                {
-                    roles = rolesArray.ToObject<List<string>>() ?? [];
-                }
-                else
-                {
-                    throw new JsonException("Role claim is not an array");
-                }
+                // If we are not using JSON values, just use the raw info from the claim value
+                roles.Add(claim.Value);
             }
-            catch (JsonException error)
+            else
             {
-                logger.LogError(error, "Error parsing JSON role claim: {Claim}", claim.Value);
-                return;
+                try
+                {
+                    JToken currentToken = segments
+                        .Skip(1)
+                        .Aggregate(JToken.Parse(claim.Value), (current, segment) => current[segment]);
+
+                    if (currentToken is JArray rolesArray)
+                    {
+                        roles.AddRange(rolesArray.ToObject<List<string>>() ?? []);
+                    }
+                    else
+                    {
+                        throw new JsonException("Role claim is not an array");
+                    }
+                }
+                catch (JsonException error)
+                {
+                    logger.LogError(error, "Error parsing JSON role claim: {Claim}", claim.Value);
+                }
             }
         }
 
