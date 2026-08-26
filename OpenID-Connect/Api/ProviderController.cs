@@ -102,6 +102,19 @@ public class ProviderController(
     }
 
     /// <summary>
+    ///     Checks if migration from 9p4 config is available
+    /// </summary>
+    /// <returns></returns>
+    [Authorize(Policy = Policies.RequiresElevation)]
+    [HttpGet("MigrationAvailable")]
+    public ActionResult MigrationAvailable([FromServices] IApplicationPaths applicationPaths)
+    {
+        string oldPath = Path.Combine(applicationPaths.PluginConfigurationsPath, "SSO-Auth.xml");
+
+        return Ok(System.IO.File.Exists(oldPath));
+    }
+
+    /// <summary>
     ///     Migrates providers from the old provider config to the new one
     /// </summary>
     [Authorize(Policy = Policies.RequiresElevation)]

@@ -23,6 +23,19 @@ const oidcConfigurationPage = {
 
         const user_container = page.querySelector("#AutoLinkingAllowList");
         oidcConfigurationPage.populateUsers(user_container);
+
+        oidcConfigurationPage.checkMigrationAvailable(page);
+    },
+
+    checkMigrationAvailable: (page) => {
+        const migrateBtn = page.querySelector("#oidc-migrate-btn");
+        ApiClient.getJSON(ApiClient.getUrl("OpenIDConnect/Providers/MigrationAvailable"))
+            .then((available) => {
+                migrateBtn.style.display = available ? "" : "none";
+            })
+            .catch(() => {
+                migrateBtn.style.display = "none";
+            });
     },
 
     renderProviderList: (page, providers) => {
