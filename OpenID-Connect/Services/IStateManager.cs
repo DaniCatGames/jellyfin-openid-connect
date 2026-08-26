@@ -131,6 +131,6 @@ public class TimedAuthorizeState(AuthorizeState state, DateTime created)
     /// </summary>
     public bool IsExpired()
     {
-        return Created < DateTime.UtcNow.AddMinutes(-1);
+        return Created < DateTime.UtcNow.AddMinutes(-5);
     }
 }

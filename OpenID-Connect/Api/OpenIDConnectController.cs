@@ -117,7 +117,7 @@ public class OpenIDConnectController(
         segments = segments.Select(i => i.Replace("\\.", ".")).ToArray();
 
         Claim[] roleClaims = [.. result.User.Claims.Where(claim => claim.Type == segments[0])];
-        
+
         if (roleClaims.Length > 0)
         {
             ProcessRoles(segments, roleClaims, config, timedState);
