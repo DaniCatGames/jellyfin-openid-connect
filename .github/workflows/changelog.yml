@@ -11,7 +11,7 @@ jobs:
     permissions:
       contents: write
       pull-requests: read
-    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/changelog.yaml@eb99033a7ff644881b014bc0b4169916c854a68b # master
+    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/changelog.yaml@90939233af180b897916325bcb36ff05988d6d40 # master
     with:
       repository-name: DaniCatGames/jellyfin-openid-connect
     secrets:
