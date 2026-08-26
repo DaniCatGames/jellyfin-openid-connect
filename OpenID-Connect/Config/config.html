@@ -49,7 +49,7 @@
                 You can use
                 <a
                     class="button-link"
-                    href="https://jellyfin.org/docs/general/clients/web-config.html#custom-menu-links"
+                    href="https://jellyfin.org/docs/general/clients/web-config/#custom-menu-links"
                     is="emby-linkbutton"
                     target="_blank"
                 >custom menu links
@@ -109,7 +109,7 @@
                         <div class="collapseContent">
                             <div class="inputContainer">
                                 <label class="inputLabel inputLabelUnfocused" for="ProviderName">Provider
-                                    Name</label>
+                                    Name (Required)</label>
                                 <input class="oidc-text" id="ProviderName" is="emby-input" required="" type="text"/>
                                 <div class="fieldDescription">
                                     Provider identifier (must be unique), used to identify this provider in API calls
@@ -118,7 +118,8 @@
                             </div>
 
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="Endpoint">OpenID Endpoint</label>
+                                <label class="inputLabel inputLabelUnfocused" for="Endpoint">OpenID Endpoint
+                                    (Required)</label>
                                 <input class="oidc-text" id="Endpoint" is="emby-input"
                                        placeholder="https://auth.example.com" required=""
                                        type="text"/>
@@ -128,7 +129,8 @@
                             </div>
 
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="ClientId">Client ID</label>
+                                <label class="inputLabel inputLabelUnfocused" for="ClientId">Client ID
+                                    (Required)</label>
                                 <input class="oidc-text" id="ClientId" is="emby-input" required="" type="text"/>
                                 <div class="fieldDescription">
                                     The OIDC client ID for this Jellyfin instance, configured on the provider side.
@@ -136,7 +138,8 @@
                             </div>
 
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="Secret">Client Secret</label>
+                                <label class="inputLabel inputLabelUnfocused" for="Secret">Client Secret
+                                    (Required)</label>
 
                                 <div style="display: flex; align-items: center; gap: 0.5em;">
                                     <input class="oidc-text" id="Secret" is="emby-input" required=""
@@ -218,8 +221,9 @@
                                     <span>Auto Provision Users</span>
                                 </label>
                                 <div class="fieldDescription checkboxFieldDescription">
-                                    When enabled, users will be automatically created upon first login if their name is
-                                    different from any existing jellyfin users
+                                    When enabled, users will be automatically created. If a jellyfin user with the same
+                                    name already exists and is not on the auto-linking list, this will create a user
+                                    with a unique suffix.
                                 </div>
                             </div>
 
@@ -230,8 +234,8 @@
                                     <span>Update Users on Login</span>
                                 </label>
                                 <div class="fieldDescription checkboxFieldDescription">
-                                    If enabled, user info and permissions are updated on every login.
-                                    If disabled, permissions and info are only set on creation.
+                                    If enabled, user profile pictures and permissions are updated on every login.
+                                    If disabled, permissions and profile pictures are only set on creation.
                                 </div>
                             </div>
 
@@ -252,7 +256,8 @@
                                           placeholder="jellyfin_admin"></textarea>
                                 <div class="fieldDescription">
                                     One role per line. Users with any of these roles receive admin privileges.
-                                    Leave blank to not auto-grant admin.
+                                    Leave blank to not auto-grant admin. Users with any of these roles also
+                                    automatically gain access and do not need a role from <code>Allowed Roles</code>.
                                 </div>
                             </div>
 
@@ -344,6 +349,9 @@
                                            name="EnableLiveTvManagement" type="checkbox"/>
                                     <span>Grant Live TV Management</span>
                                 </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    Does not automatically grant viewing permission.
+                                </div>
                             </div>
 
                             <div class="checkboxContainer checkboxContainer-withDescription"
@@ -407,11 +415,12 @@
                                     <!-- Options populated dynamically by JS -->
                                 </select>
                                 <div class="fieldDescription">
-                                    Sets the authorization provider to use for users created by OIDC (not linked!),
-                                    the OIDC provider only allows login via an IdP. Users created by OIDC do not have
-                                    a password set, so ensure that the selected provider has custom password checking
-                                    functionality (eg LDAP), or ensure users created by OIDC have jellyfin passwords set
-                                    if using the Default authentication provider.
+                                    <strong>Warning: Users created by OIDC do not have a password!</strong> If using
+                                    the Jellyfin provider, ensure all users have a password set on their Jellyfin
+                                    accounts (not IdP account).
+                                    <br/>
+                                    Sets the authorization provider to use for users created by OIDC, the OIDC provider
+                                    only allows login via an IdP.
                                 </div>
                             </div>
 

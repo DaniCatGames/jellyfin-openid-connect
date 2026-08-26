@@ -545,7 +545,7 @@ export default function (view) {
     view.querySelector("#oidc-migrate-btn").addEventListener("click", () => {
         if (
             !window.confirm(
-                "This will migrate settings from 9p4's SSO plugin. Current providers will be overriden they have the same name. Linked users and the avatar URL will not be migrated. Continue?",
+                "This will migrate settings from 9p4's SSO plugin. Current providers will be overriden if they have the same name. Linked users and the avatar URL will not be migrated. Continue?",
             )
         ) {
             return;
