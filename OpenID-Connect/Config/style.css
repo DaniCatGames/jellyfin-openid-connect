@@ -260,3 +260,64 @@
         width: 100%;
     }
 }
+
+/* Container for the tags */
+.oidc-tag-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    padding: 0.4em 0.5em;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--card-border, #333);
+    border-radius: 0.4em;
+    align-items: center;
+    cursor: text;
+    transition: border-color 0.2s ease;
+}
+
+.oidc-tag-container:focus-within {
+    border-color: var(--emphasis, #00a4dc);
+}
+
+/* Individual Tag Styling */
+.oidc-tag {
+    background: var(--emphasis, #00a4dc);
+    color: #fff;
+    padding: 0.2em 0.6em;
+    border-radius: 1em;
+    font-size: 0.9em;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4em;
+    user-select: none;
+}
+
+/* Fixed/Unremovable Tags */
+.oidc-tag-fixed {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--secondary-text, #aaa);
+    border: 1px solid var(--card-border, #333);
+}
+
+/* Tag Remove Button */
+.oidc-tag-remove {
+    cursor: pointer;
+    font-weight: bold;
+    opacity: 0.7;
+}
+
+.oidc-tag-remove:hover {
+    opacity: 1;
+}
+
+/* The invisible input inside the container */
+.oidc-tag-input {
+    background: transparent;
+    border: none !important;
+    color: inherit;
+    outline: none !important;
+    flex-grow: 1;
+    min-width: 120px;
+    padding: 0.2em 0;
+    margin: 0;
+}

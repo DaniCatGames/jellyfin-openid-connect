@@ -396,15 +396,19 @@
                         <h3 class="sectionTitle">Advanced Options</h3>
                         <div class="collapseContent">
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="Scopes">Additional Scopes</label>
-                                <textarea class="oidc-line-list emby-textarea" id="Scopes" is="emby-textarea"
-                                          placeholder="email"></textarea>
+                                <label class="inputLabel inputLabelUnfocused">Additional Scopes</label>
+
+                                <div class="oidc-tag-container" id="ScopesTagUI" tabindex="0">
+                                    <span class="oidc-tag oidc-tag-fixed">openid</span>
+                                    <span class="oidc-tag oidc-tag-fixed">profile</span>
+                                    <input class="oidc-tag-input" id="ScopesTagInput" placeholder="Add scope (e.g. email)..."
+                                           type="text"/>
+                                </div>
+
                                 <div class="fieldDescription">
-                                    One scope per line. Some providers (e.g. Authelia) require additional scopes
-                                    for group membership validation. Leave blank for default scopes only.
-                                    <br/>
-                                    <code>openid</code> and <code>profile</code> are always included and should not be
-                                    listed here.
+                                    Press <strong>Enter</strong> or <strong>Space</strong> to add a scope.
+                                    <code>openid</code> and <code>profile</code> are always included and cannot be
+                                    removed.
                                 </div>
                             </div>
 

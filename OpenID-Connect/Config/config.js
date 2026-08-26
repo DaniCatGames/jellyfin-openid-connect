@@ -1,5 +1,69 @@
 let dirty = false;
 
+const ScopeManager = {
+    tags: [],
+    fixedTags: ["openid", "profile"],
+
+    init: function (page) {
+        this.container = page.querySelector("#ScopesTagUI");
+        this.input = page.querySelector("#ScopesTagInput");
+
+        this.input.addEventListener("keydown", (e) => {
+            if (["Enter", " ", ","].includes(e.key)) {
+                e.preventDefault();
+                this.addTag(this.input.value);
+            } else if (e.key === "Backspace" && this.input.value === "" && this.tags.length > 0) {
+                this.tags.pop();
+                this.render();
+                dirty = true;
+            }
+        });
+
+        this.container.addEventListener("click", () => this.input.focus());
+    },
+
+    addTag: function (value) {
+        const cleanTag = value.trim().toLowerCase();
+        if (cleanTag === "" || this.tags.includes(cleanTag) || this.fixedTags.includes(cleanTag)) {
+            this.input.value = "";
+            return;
+        }
+        this.tags.push(cleanTag);
+        this.input.value = "";
+        this.render();
+        dirty = true;
+    },
+
+    render: function () {
+        // Clear dynamic tags
+        this.container.querySelectorAll(".oidc-tag:not(.oidc-tag-fixed)").forEach((el) => el.remove());
+
+        this.tags.forEach((tag) => {
+            const span = document.createElement("span");
+            span.className = "oidc-tag";
+            span.innerHTML = `${tag} <span class="oidc-tag-remove" data-tag="${tag}">&times;</span>`;
+
+            span.querySelector(".oidc-tag-remove").addEventListener("click", () => {
+                this.tags = this.tags.filter((t) => t !== tag);
+                this.render();
+                dirty = true;
+            });
+
+            this.container.insertBefore(span, this.input);
+        });
+    },
+
+    get: function () {
+        return this.tags;
+    },
+
+    set: function (newTags) {
+        // Filter out nulls and fixed tags from incoming data
+        this.tags = (newTags || []).filter((t) => t && !this.fixedTags.includes(t));
+        this.render();
+    },
+};
+
 const oidcConfigurationPage = {
     pluginUniqueId: "3b621017-67a3-461e-a820-21622c591827",
 
@@ -172,6 +236,8 @@ const oidcConfigurationPage = {
 
         oidcConfigurationPage.updateLibraryAccessVisibility(page);
         oidcConfigurationPage.updateLiveTvVisibility(page);
+
+        ScopeManager.set([]);
     },
 
     populateEnabledFolders: (folder_list, container) => {
@@ -359,6 +425,8 @@ const oidcConfigurationPage = {
 
             page.querySelector("#ProviderName").value = provider_name;
 
+            ScopeManager.set(provider.Scopes);
+
             form_elements.text_fields.forEach((id) => {
                 if (provider[id]) page.querySelector("#" + id).value = provider[id];
             });
@@ -472,6 +540,8 @@ const oidcConfigurationPage = {
             current_config.AutoLinkingAllowList = [...userContainer.querySelectorAll(".user-checkbox")]
                 .filter((cb) => cb.checked)
                 .map((cb) => cb.getAttribute("data-username"));
+
+            current_config["Scopes"] = ScopeManager.get();
 
             if (current_config["Endpoint"] === null || current_config["Endpoint"].trim() === "") {
                 Dashboard.alert("Endpoint cannot be empty.");
@@ -663,4 +733,6 @@ export default function (view) {
     view.querySelector("#EnableLiveTvManagement").addEventListener("change", () => {
         oidcConfigurationPage.updateLiveTvVisibility(view);
     });
+
+    ScopeManager.init(view);
 }
