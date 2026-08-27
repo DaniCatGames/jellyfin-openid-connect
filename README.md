@@ -34,7 +34,6 @@ This is 100% alpha software! PRs are welcome to improve the code.
 - [x] Fix account linking
 - [ ] RP Initiated Logout for browser sessions
 - [x] Use 'picture' claim for avatar syncing
-- [ ] Expose js function to automatically create login page links
 - [x] Toggle user provisioning
 - [x] Allow auto-linking only for selected users
 - [x] Update configuration UI
