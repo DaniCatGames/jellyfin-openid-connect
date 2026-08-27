@@ -89,7 +89,7 @@ public class OidcUserManager(
                 "OIDC user link doesn't exist, creating new link between sub {sub} and jellyfin user {username}.",
                 timedState.Sub,
                 existingUser.Username);
-            linkManager.TryCreateLink(provider, timedState.Username, existingUser.Id);
+            linkManager.TryCreateLink(provider, timedState.Sub, existingUser.Id);
             return existingUser.Id;
         }
 
