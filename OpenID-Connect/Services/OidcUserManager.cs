@@ -94,6 +94,11 @@ public class OidcUserManager(
         }
 
         // user exists but isnt in allowlist, so create a new one with an alt username
+        if (!config.EnableUserProvisioning)
+        {
+            return Guid.Empty;
+        }
+
         string newUsername = $"{timedState.Username} - {provider}";
         User newUser = userManager.GetUserByName(newUsername);
 
