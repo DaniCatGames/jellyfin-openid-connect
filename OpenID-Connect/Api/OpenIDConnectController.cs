@@ -68,7 +68,7 @@ public class OpenIDConnectController(
         }
 
         if (!stateManager.TryGetValue(state, out TimedAuthorizeState timedState)
-            || timedState.IsExpired())
+            || timedState.IsExpired() || timedState.Provider != provider)
         {
             return BadRequest("Invalid or expired state");
         }
@@ -291,6 +291,7 @@ public class OpenIDConnectController(
         {
             IsLinking = isLinking,
             IsTesting = isTesting,
+            Provider = provider,
         };
 
         stateManager.TryAdd(state.State, timedState);
@@ -332,7 +333,7 @@ public class OpenIDConnectController(
             return Problem("State not found");
         }
 
-        if (!timedState.IsValid())
+        if (!timedState.IsValid(provider))
         {
             return Problem("State is not valid or expired.");
         }
