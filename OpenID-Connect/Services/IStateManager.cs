@@ -99,6 +99,11 @@ public class TimedAuthorizeState(AuthorizeState state, DateTime created)
     public string Provider { get; init; }
 
     /// <summary>
+    ///     Cookie to bind to the browser.
+    /// </summary>
+    public string Cookie { get; set; }
+
+    /// <summary>
     ///     Gets or sets the folders the user is allowed access to.
     /// </summary>
     public List<string> DefaultAllowedFolders { get; set; }
@@ -126,9 +131,9 @@ public class TimedAuthorizeState(AuthorizeState state, DateTime created)
     /// <summary>
     ///     Check if a state is still valid.
     /// </summary>
-    public bool IsValid(string provider)
+    public bool IsValid(string provider, string flowCookie)
     {
-        return Valid && !IsExpired() && Provider == provider;
+        return Valid && !IsExpired() && Provider == provider && Cookie == flowCookie;
     }
 
     /// <summary>

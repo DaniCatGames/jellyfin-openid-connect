@@ -66,7 +66,8 @@ public class LinkController(
             return Problem("State not found");
         }
 
-        if (!timedState.IsValid(provider))
+        Request.Cookies.TryGetValue("oidc_flow", out string flowCookie);
+        if (!timedState.IsValid(provider, flowCookie))
         {
             return Problem("State is not valid");
         }

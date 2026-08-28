@@ -16,6 +16,7 @@ using MediaBrowser.Common.Api;
 using MediaBrowser.Controller.Authentication;
 using MediaBrowser.Controller.Library;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -154,6 +155,19 @@ public class OpenIDConnectController(
         }
 
         logger.LogInformation("Is request linking: {IsLinking}", timedState.IsLinking);
+
+        string flowCookie = Guid.NewGuid().ToString("N");
+        timedState.Cookie = flowCookie;
+        Response.Cookies.Append("oidc_flow",
+            flowCookie,
+            new CookieOptions
+            {
+                HttpOnly = true,
+                SameSite = SameSiteMode.Lax,
+                MaxAge = TimeSpan.FromMinutes(5),
+                Secure = Request.IsHttps
+            });
+
         return Content(WebResponse.Generator(state,
                 provider,
                 GetRequestBase(config.UseHTTP, config.PortOverride),
@@ -333,7 +347,8 @@ public class OpenIDConnectController(
             return Problem("State not found");
         }
 
-        if (!timedState.IsValid(provider))
+        Request.Cookies.TryGetValue("oidc_flow", out string flowCookie);
+        if (!timedState.IsValid(provider, flowCookie))
         {
             return Problem("State is not valid or expired.");
         }
