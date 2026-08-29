@@ -9,7 +9,7 @@ jobs:
     permissions:
       pull-requests: write
       contents: read
-    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/autolabel.yaml@90939233af180b897916325bcb36ff05988d6d40 # master
+    uses: jellyfin/jellyfin-meta-plugins/.github/workflows/autolabel.yaml@facf0dc93920880bb311641b5117eae2df8cca63 # master
     with:
       repository-name: DaniCatGames/jellyfin-plugin-oidc
     secrets:
