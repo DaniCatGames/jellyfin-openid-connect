@@ -1,3 +1,4 @@
+using System;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -198,7 +199,7 @@ public class ProviderController(
                 UseHTTP = ssoAuthProvider.SchemeOverride == "http",
                 DoNotLoadProfile = ssoAuthProvider.DoNotLoadProfile,
                 PortOverride = ssoAuthProvider.PortOverride,
-                Links = null,
+                Links = new SerializableDictionary<string, Guid>(),
             };
 
             currentConfig.Configs[name] = newConfig;

@@ -16,7 +16,7 @@ public class LinkManager : ILinkManager
             return false;
         }
 
-        links = config.Links;
+        links = config.Links ?? new SerializableDictionary<string, Guid>();
         return true;
     }
 
