@@ -125,18 +125,16 @@ public class OpenIDConnectController(
         }
 
         Claim subClaim = result.User.Claims.FirstOrDefault(claim => claim.Type == "sub");
-        if (subClaim != null)
+        if (subClaim == null)
         {
-            timedState.Sub = subClaim.Value;
-            if (config.Roles is not { Length: > 0 })
-            {
-                timedState.Valid = true;
-            }
-        }
-        else
-        {
-            logger.LogWarning("OpenID user {Username} does not have a sub claim", timedState.Sub);
+            logger.LogError("OpenID user {Username} does not have a sub claim", timedState.Sub);
             return Unauthorized("Error. Check IdP or plugin config.");
+        }
+
+        timedState.Sub = subClaim.Value;
+        if (config.Roles is not { Length: > 0 })
+        {
+            timedState.Valid = true;
         }
 
         Claim usernameClaim = result.User.Claims.FirstOrDefault(claim =>
@@ -165,7 +163,7 @@ public class OpenIDConnectController(
                 HttpOnly = true,
                 SameSite = SameSiteMode.Lax,
                 MaxAge = TimeSpan.FromMinutes(5),
-                Secure = Request.IsHttps
+                Secure = Request.IsHttps,
             });
 
         return Content(WebResponse.Generator(state,
