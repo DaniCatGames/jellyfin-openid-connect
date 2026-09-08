@@ -16,6 +16,7 @@ public class PluginConfiguration : BasePluginConfiguration
     public PluginConfiguration()
     {
         Configs = new SerializableDictionary<string, Config>();
+        HasMigrated = false;
     }
 
     /// <summary>
@@ -23,6 +24,11 @@ public class PluginConfiguration : BasePluginConfiguration
     /// </summary>
     [XmlElement("Configs")]
     public SerializableDictionary<string, Config> Configs { get; set; }
+
+    /// <summary>
+    ///     Gets or sets whether this instance has been migrated from 9p4's plugin.
+    /// </summary>
+    public bool HasMigrated { get; set; }
 }
 
 /// <summary>

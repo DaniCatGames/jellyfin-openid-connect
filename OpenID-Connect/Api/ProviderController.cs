@@ -110,8 +110,9 @@ public class ProviderController(
     public ActionResult MigrationAvailable([FromServices] IApplicationPaths applicationPaths)
     {
         string oldPath = Path.Combine(applicationPaths.PluginConfigurationsPath, "SSO-Auth.xml");
+        bool hasMigrated = OpenIDConnect.Instance.Configuration.HasMigrated;
 
-        return Ok(System.IO.File.Exists(oldPath));
+        return Ok(System.IO.File.Exists(oldPath) && !hasMigrated);
     }
 
     /// <summary>
@@ -202,6 +203,8 @@ public class ProviderController(
 
             currentConfig.Configs[name] = newConfig;
         }
+
+        currentConfig.HasMigrated = true;
 
         OpenIDConnect.Instance.UpdateConfiguration(currentConfig);
 
