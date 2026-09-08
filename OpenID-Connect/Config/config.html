@@ -234,6 +234,9 @@
                                     <span>Update Users on Login</span>
                                 </label>
                                 <div class="fieldDescription checkboxFieldDescription">
+                                    <strong>Highly recommended when Admin Roles are enabled, to automatically remove
+                                        admin privileges.</strong>
+                                    <br/>
                                     If enabled, user profile pictures and permissions are updated on every login.
                                     If disabled, permissions and profile pictures are only set on creation.
                                 </div>
@@ -266,13 +269,23 @@
                                 <div class="checkboxList paperList checkboxList-paperList oidc-bordered-list"
                                      id="AutoLinkingAllowList" style="max-height: 250px; overflow-y: auto;"></div>
                                 <div class="fieldDescription">
-                                    Select existing local users that should be automatically linked the first time they
-                                    log in via this provider. Any user with the same username in the IdP as a user in
-                                    this list will be automatically linked to that user. If users are able to customize
-                                    their own names in the IdP, ensure that you trust them, users with the same IdP name
-                                    as the jellyfin administrator account name can take control over the jellyfin
-                                    account.
-                                    Once successfully linked, the user is automatically removed from this list.
+                                    <strong>Warning: Allows <i>any</i> IdP user to take over <i>any</i> jellyfin account
+                                        if their username claim matches an existing jellyfin user!</strong> Ensure you
+                                    trust all users on your IdP and be extra careful when enabling admin users.
+                                    <br/>
+                                    <br/>
+                                    Users selected here will be automatically linked to an IdP user if a user logs in
+                                    from the IdP if their username claim matches a selected user (not case-sensitive).
+                                    Once a user is linked, they are automatically removed from this list for security.
+                                    Jellyfin users can always manage their links on the self link page. If an IdP user
+                                    tries to log in with a username claim matching an existing jellyfin user, and they
+                                    are not this list, a new account will be created (if provisioning is enabled) with a
+                                    discriminator.
+                                    <br/>
+                                    <br/>
+                                    Example: an IdP user with username Admin trying to log in without a
+                                    link and Admin isnt auto-linkable will get an account called "Admin - Authentik -
+                                    9b312f..." instead of getting access to the jellyfin Admin account.
                                 </div>
                             </div>
                         </div>
@@ -401,7 +414,8 @@
                                 <div class="oidc-tag-container" id="ScopesTagUI" tabindex="0">
                                     <span class="oidc-tag oidc-tag-fixed">openid</span>
                                     <span class="oidc-tag oidc-tag-fixed">profile</span>
-                                    <input class="oidc-tag-input" id="ScopesTagInput" placeholder="Add scope (e.g. email)..."
+                                    <input class="oidc-tag-input" id="ScopesTagInput"
+                                           placeholder="Add scope (e.g. email)..."
                                            type="text"/>
                                 </div>
 
@@ -413,15 +427,16 @@
                             </div>
 
                             <div class="inputContainer">
-                                <label class="inputLabel inputLabelUnfocused" for="DefaultAuthProvider">Authentication
-                                    Provider</label>
+                                <label class="inputLabel inputLabelUnfocused" for="DefaultAuthProvider">Default
+                                    Authentication Provider</label>
                                 <select class="oidc-select" id="DefaultAuthProvider" is="emby-select">
                                     <!-- Options populated dynamically by JS -->
                                 </select>
                                 <div class="fieldDescription">
                                     <strong>Warning: Users created by OIDC do not have a password!</strong> If using
-                                    the Jellyfin provider, ensure all users have a password set on their Jellyfin
-                                    accounts (not IdP account).
+                                    the Jellyfin provider, ensure all users created with this provider have a password
+                                    set on their Jellyfin accounts (not IdP account).
+                                    <br/>
                                     <br/>
                                     Sets the authorization provider to use for users created by OIDC, the OIDC provider
                                     only allows login via an IdP.
