@@ -7,6 +7,7 @@ using MediaBrowser.Controller.Net;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.OpenIDConnect.Api;
 
@@ -21,7 +22,8 @@ namespace Jellyfin.Plugin.OpenIDConnect.Api;
 public class LinkController(
     IAuthorizationContext authContext,
     ILinkManager linkManager,
-    IStateManager stateManager
+    IStateManager stateManager,
+    ILogger<LinkController> logger
 ) : ControllerBase
 {
     /// <summary>
@@ -78,6 +80,8 @@ public class LinkController(
         {
             return BadRequest("Error. Check server logs.");
         }
+        
+        logger.LogInformation("User {Username} linked to jellyfin user {UserId} via {Provider}", timedState.Username, jellyfinUserId, provider);
 
         return NoContent();
     }
@@ -130,7 +134,14 @@ public class LinkController(
             return Conflict("Jellyfin User ID does not match the user id registered to that IdP sub.");
         }
 
-        return linkManager.TryDeleteLink(provider, sub) ? NoContent() : BadRequest("Error. Check server logs.");
+        if (!linkManager.TryDeleteLink(provider, sub))
+        {
+            return BadRequest("Error. Check server logs.");
+        }
+        
+        logger.LogInformation("User {Sub} unlinked from jellyfin user {UserId} via {Provider}", sub, jellyfinUserId, provider);
+
+        return NoContent();
     }
 
     /// <summary>

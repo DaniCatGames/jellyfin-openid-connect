@@ -82,7 +82,10 @@ public class OpenIDConnectController(
 
         if (result.IsError)
         {
-            return BadRequest($"Error logging in: {result.Error} - {result.ErrorDescription}");
+            logger.LogError("Error logging in a user: {Error} - {ErrorDescription}",
+                result.Error,
+                result.ErrorDescription);
+            return BadRequest("Error logging in, check server logs.");
         }
 
         if (timedState.IsTesting)
@@ -128,7 +131,7 @@ public class OpenIDConnectController(
         if (subClaim == null)
         {
             logger.LogError("OpenID user {Username} does not have a sub claim", timedState.Sub);
-            return Unauthorized("Error. Check IdP or plugin config.");
+            return Unauthorized("Error. Check server logs.");
         }
 
         timedState.Sub = subClaim.Value;
@@ -152,7 +155,8 @@ public class OpenIDConnectController(
             return Unauthorized("Error. Check permissions.");
         }
 
-        logger.LogInformation("Is request linking: {IsLinking}", timedState.IsLinking);
+        logger.LogDebug("Is request linking: {IsLinking}", timedState.IsLinking);
+        logger.LogDebug("Is request testing: {IsTesting}", timedState.IsTesting);
 
         string flowCookie = Guid.NewGuid().ToString("N");
         timedState.Cookie = flowCookie;
@@ -307,6 +311,8 @@ public class OpenIDConnectController(
         };
 
         stateManager.TryAdd(state.State, timedState);
+        
+        logger.LogInformation("OpenID login started via {Provider}", provider);
 
         return Redirect(state.StartUrl);
     }
@@ -365,6 +371,8 @@ public class OpenIDConnectController(
                 timedState,
                 HttpContext.Connection.RemoteIpAddress?.ToString())
             .ConfigureAwait(false);
+        
+        logger.LogInformation("User {Username} authenticated via {Provider}", timedState.Username, provider);
 
         stateManager.TryRemove(response.Data, out _);
         return Ok(authenticationResult);
@@ -374,7 +382,7 @@ public class OpenIDConnectController(
     ///     Removes a user from SSO auth and switches it back to another auth provider. Requires administrator privileges.
     /// </summary>
     /// <param name="username">The username to switch to the new provider.</param>
-    /// <param name="provider">The new jellyfin auth provider to switch to (not an IdP).</param>
+    /// <param name="provider">The new jellyfin auth provider to switch to (not an IdP!).</param>
     /// <returns>Whether this API endpoint succeeded.</returns>
     [Authorize(Policy = Policies.RequiresElevation)]
     [HttpPost("Unregister/{username}")]
@@ -387,6 +395,8 @@ public class OpenIDConnectController(
         }
 
         await oidcUserManager.UnregisterUser(user, provider).ConfigureAwait(false);
+        
+        logger.LogInformation("User {Username} unregistered from {Provider}", username, provider);
 
         return Ok();
     }

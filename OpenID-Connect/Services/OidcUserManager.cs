@@ -96,6 +96,7 @@ public class OidcUserManager(
         // user exists but isnt in allowlist, so create a new one with an alt username
         if (!config.EnableUserProvisioning)
         {
+            logger.LogInformation("OIDC user {Username} has no matching jellyfin user, but provisioning is disabled.", timedState.Username);
             return Guid.Empty;
         }
 
@@ -273,9 +274,11 @@ public class OidcUserManager(
             await providerManager.SaveImage(stream, contentType, user.ProfileImage.Path)
                 .ConfigureAwait(false);
         }
-        catch (Exception e)
+        catch
         {
-            logger.LogError(e.Message);
+            logger.LogError("Failed to set profile picture for user {Username} from avatar URL {URL}",
+                user.Username,
+                avatarUrl);
         }
     }
 }
