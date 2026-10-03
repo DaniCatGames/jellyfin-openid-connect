@@ -16,4 +16,29 @@ artifacts:
   - "Duende.IdentityModel.dll"
   - "Microsoft.Security.AntiSSRF.dll"
 changelog: |-
-  - Unstable release
+  - Rename plugin to OpenID Connect
+  - Update to Jellyfin 12/.NET 10
+  - Allow toggling user provisioning per provider
+  - Added new config UI
+  - Add way to test provider from config panel
+  - Restrict auto-linking to selected users to prevent accidental/malicious account takeover, IdP users with names matching an existing jellyfin account get new accounts with the name of the IdP or user sub as a suffix
+  - Use picture claim (configurable) for user profile pictures
+  - Use sub claim instead of preferred_username (or configured) for linking IdP users to jellyfin users, so changing IdP name wont result in a new jellyfin account being created.
+  - Select default authentication provider (for jellyfin, not IdP) with a dropdown instead of text field
+  - Always allow users with admin roles to log in
+  - Removed deprecated flow paths (/r/, /p/)
+  - Removed references to SAML
+  - Use ConcurrentDictionary for safety
+  - Fixed a bunch of null safety issues
+  - Fix linking
+  - Correctly remove links when unregistering
+  - Delete links pointing to a user when that user is deleted by an admin
+  - Bunch of small fixes
+  - Update API paths
+  - Ensure provider names are safe to use in URLs
+  - Clarified a bunch of config options
+  - Validate endpoint, client id, and secret exist when creating provider
+  - Log IP addresses correctly into the authentication logs
+  - Scopes configuration option is much improved
+  - Restrict flows to browser by adding a cookie to each login flow
+  - Add SSRF protection to user avatar retrieval
