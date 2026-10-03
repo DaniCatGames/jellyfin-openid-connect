@@ -1,1 +1,21 @@
-[]
+[
+    {
+        "guid": "3b621017-67a3-461e-a820-21622c591827",
+        "name": "OpenID Connect",
+        "description": "This plugin allows users to sign in through an OIDC provider (such as Google, Facebook, or your own provider). This enables one-click signin.\nReview documentation at https://github.com/DaniCatGames/jellyfin-openid-connect\n",
+        "overview": "Authenticate users against an OIDC provider.",
+        "owner": "DaniCatGames",
+        "category": "Authentication",
+        "versions": [
+            {
+                "version": "1.0.0.0",
+                "changelog": "- Rename plugin to OpenID Connect\n- Update to Jellyfin 12/.NET 10\n- Allow toggling user provisioning per provider\n- Added new config UI\n- Add way to test provider from config panel\n- Restrict auto-linking to selected users to prevent accidental/malicious account takeover, IdP users with names matching an existing jellyfin account get new accounts with the name of the IdP or user sub as a suffix\n- Use picture claim (configurable) for user profile pictures\n- Use sub claim instead of preferred_username (or configured) for linking IdP users to jellyfin users, so changing IdP name wont result in a new jellyfin account being created.\n- Select default authentication provider (for jellyfin, not IdP) with a dropdown instead of text field\n- Always allow users with admin roles to log in\n- Removed deprecated flow paths (/r/, /p/)\n- Removed references to SAML\n- Use ConcurrentDictionary for safety\n- Fixed a bunch of null safety issues\n- Fix linking\n- Correctly remove links when unregistering\n- Delete links pointing to a user when that user is deleted by an admin\n- Bunch of small fixes\n- Update API paths\n- Ensure provider names are safe to use in URLs\n- Clarified a bunch of config options\n- Validate endpoint, client id, and secret exist when creating provider\n- Log IP addresses correctly into the authentication logs\n- Scopes configuration option is much improved\n- Restrict flows to browser by adding a cookie to each login flow\n- Add SSRF protection to user avatar retrieval",
+                "targetAbi": "12.0.0",
+                "sourceUrl": "https://github.com/DaniCatGames/jellyfin-openid-connect/releases/download/v1.0.0.0/openid-connect_1.0.0.0.zip",
+                "checksum": "bbda0d9be2b9219af1cd898e1144bb03",
+                "timestamp": "2026-10-03T19:53:08Z"
+            }
+        ],
+        "imageUrl": "https://raw.githubusercontent.com/DaniCatGames/jellyfin-openid-connect/main/img/logo.png"
+    }
+]
