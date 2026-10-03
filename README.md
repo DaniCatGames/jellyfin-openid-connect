@@ -26,19 +26,7 @@ Existing users may link new OIDC accounts, or remove existing links using self-s
 
 ## Current State
 
-This is 100% alpha software! PRs are welcome to improve the code.
-
 **This is for Jellyfin >=12.0 and only on the Web UI or clients supporting [Quick Connect](https://jellyfin.org/docs/general/server/quick-connect)**
-
-## Roadmap
-- [x] Fix account linking
-- [ ] RP Initiated Logout for browser sessions
-- [x] Use 'picture' claim for avatar syncing
-- [x] Toggle user provisioning
-- [x] Allow auto-linking only for selected users
-- [x] Update configuration UI
-- [x] Update documentation to reflect changes
-- [x] Add way to test configured provider
 
 ## Tested Providers
 
@@ -88,9 +76,33 @@ See [Building & Releasing](docs/building.md) for instructions on how to build fr
 
 Logging in with an OIDC account that has the same username as an existing Jellyfin account will override the permissions for the user. Use caution when overriding the administrator account!
 
-There is no GUI to sign in. You have to make it yourself! The buttons should redirect to something like this: `https://jellyfin.example.com/OpenIDConnect/start/<provider name>` replacing `<provider name>` with the name of the provider in your config.
-
 There is also no logout callback. Logging out of Jellyfin will log you out of Jellyfin only, instead of the SSO provider as well.
+
+## Creating an OIDC login button on the Jellyfin login page
+
+In the Jellyfin administration UI, under "General", there is a "Branding" section. In that section, add the following code in the "Login disclaimer" block (replacing `PROVIDER_NAME` with the name of your configured provider):
+
+```html
+<form action="/OpenIDConnect/start/PROVIDER_NAME">
+  <button class="raised block emby-button button-submit">
+    Sign in with OIDC
+  </button>
+</form>
+```
+
+Then, add the following code in the "Custom CSS code" section:
+
+```css
+a.raised.emby-button {
+  padding: 0.9em 1em;
+  color: inherit !important;
+}
+
+.disclaimerContainer {
+  display: block;
+}
+```
+
 
 # Contributing
 
