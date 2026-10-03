@@ -311,7 +311,7 @@ public class OpenIDConnectController(
         };
 
         stateManager.TryAdd(state.State, timedState);
-        
+
         logger.LogInformation("OpenID login started via {Provider}", provider);
 
         return Redirect(state.StartUrl);
@@ -371,7 +371,7 @@ public class OpenIDConnectController(
                 timedState,
                 HttpContext.Connection.RemoteIpAddress?.ToString())
             .ConfigureAwait(false);
-        
+
         logger.LogInformation("User {Username} authenticated via {Provider}", timedState.Username, provider);
 
         stateManager.TryRemove(response.Data, out _);
@@ -395,7 +395,7 @@ public class OpenIDConnectController(
         }
 
         await oidcUserManager.UnregisterUser(user, provider).ConfigureAwait(false);
-        
+
         logger.LogInformation("User {Username} unregistered from {Provider}", username, provider);
 
         return Ok();

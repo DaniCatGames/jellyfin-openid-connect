@@ -35,6 +35,7 @@
         <PackageReference Include="Duende.IdentityModel.OidcClient" Version="7.1.0"/>
         <PackageReference Include="Jellyfin.Controller" Version="12.1.0"/>
         <PackageReference Include="Jellyfin.Model" Version="12.1.0"/>
+        <PackageReference Include="Microsoft.Security.AntiSSRF" Version="1.0.0"/>
         <PackageReference Include="Newtonsoft.Json" Version="13.0.4"/>
     </ItemGroup>
 

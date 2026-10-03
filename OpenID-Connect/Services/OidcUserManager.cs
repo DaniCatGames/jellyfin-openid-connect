@@ -16,6 +16,7 @@ using MediaBrowser.Controller.Library;
 using MediaBrowser.Controller.Providers;
 using MediaBrowser.Controller.Session;
 using Microsoft.Extensions.Logging;
+using Microsoft.Security.AntiSSRF;
 
 namespace Jellyfin.Plugin.OpenIDConnect.Services;
 
@@ -26,9 +27,11 @@ public class OidcUserManager(
     IProviderManager providerManager,
     ILogger<OidcUserManager> logger,
     ISessionManager sessionManager,
-    IServerConfigurationManager serverConfigurationManager,
-    IHttpClientFactory httpClientFactory) : IOidcUserManager
+    IServerConfigurationManager serverConfigurationManager)
+    : IOidcUserManager
 {
+    private readonly HttpClient _client = CreateClient();
+
     /// <inheritdoc />
     public async Task<Guid> GetOrCreateUser(string provider, TimedAuthorizeState timedState, Config config)
     {
@@ -96,7 +99,8 @@ public class OidcUserManager(
         // user exists but isnt in allowlist, so create a new one with an alt username
         if (!config.EnableUserProvisioning)
         {
-            logger.LogInformation("OIDC user {Username} has no matching jellyfin user, but provisioning is disabled.", timedState.Username);
+            logger.LogInformation("OIDC user {Username} has no matching jellyfin user, but provisioning is disabled.",
+                timedState.Username);
             return Guid.Empty;
         }
 
@@ -223,15 +227,7 @@ public class OidcUserManager(
     {
         try
         {
-            using HttpClient client = httpClientFactory.CreateClient();
-
-            var assembly = Assembly.GetExecutingAssembly();
-            FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
-            string version = fvi.FileVersion;
-            client.DefaultRequestHeaders.UserAgent.ParseAdd(
-                $"Jellyfin-OpenID-Connect +{version} (https://github.com/DaniCatGames/jellyfin-openid-connect)");
-
-            HttpResponseMessage avatarResponse = await client.GetAsync(avatarUrl);
+            HttpResponseMessage avatarResponse = await _client.GetAsync(avatarUrl);
 
             if (!avatarResponse.IsSuccessStatusCode)
             {
@@ -260,10 +256,9 @@ public class OidcUserManager(
 
             Stream stream = await avatarResponse.Content.ReadAsStreamAsync();
 
-            string userDataPath =
-                Path.Combine(
-                    serverConfigurationManager.ApplicationPaths.UserConfigurationDirectoryPath,
-                    user.Username);
+            string userDataPath = Path.Combine(
+                serverConfigurationManager.ApplicationPaths.UserConfigurationDirectoryPath,
+                user.Username);
             if (user.ProfileImage is not null)
             {
                 await userManager.ClearProfileImageAsync(user).ConfigureAwait(false);
@@ -274,11 +269,26 @@ public class OidcUserManager(
             await providerManager.SaveImage(stream, contentType, user.ProfileImage.Path)
                 .ConfigureAwait(false);
         }
-        catch
+        catch (Exception e)
         {
-            logger.LogError("Failed to set profile picture for user {Username} from avatar URL {URL}",
+            logger.LogError(e,
+                "Failed to set profile picture for user {Username} from avatar URL {URL}",
                 user.Username,
                 avatarUrl);
         }
+    }
+
+    private static HttpClient CreateClient()
+    {
+        var policy = new AntiSSRFPolicy(PolicyConfigOptions.ExternalOnlyLatest);
+        var client = new HttpClient(policy.GetHandler());
+
+        var assembly = Assembly.GetExecutingAssembly();
+        FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);
+        string version = fvi.FileVersion;
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(
+            $"Jellyfin-OpenID-Connect +{version} (https://github.com/DaniCatGames/jellyfin-openid-connect)");
+
+        return client;
     }
 }

@@ -46,8 +46,8 @@ public interface IOidcUserManager
         Config config,
         TimedAuthorizeState timedState,
         string ipAddress);
-    
-    
+
+
     /// <summary>
     ///     Removes a user from OIDC auth and switches it back to another auth provider.
     /// </summary>
