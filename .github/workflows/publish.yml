@@ -42,8 +42,8 @@ jobs:
       - name: Checkout stable manifest
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
-          ref: manifest-stable
-          path: manifest-stable
+          ref: manifest
+          path: manifest
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install jprm
@@ -58,12 +58,12 @@ jobs:
           jprm --verbosity=debug repo add \
             --url="$base" \
             --plugin-url="$base/$(basename "$ARTIFACT")" \
-            manifest-stable/manifest.json \
+            manifest/manifest.json \
             "$ARTIFACT"
 
       - name: Commit manifest
         run: |
-          cd manifest-stable
+          cd manifest
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -am "chore: publish ${{ github.event.release.tag_name }} to stable manifest"
