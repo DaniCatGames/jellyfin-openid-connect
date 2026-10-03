@@ -29,6 +29,16 @@ public class PluginConfiguration : BasePluginConfiguration
     ///     Gets or sets whether this instance has been migrated from 9p4's plugin.
     /// </summary>
     public bool HasMigrated { get; set; }
+
+    /// <summary>
+    ///     Whether to allow private IP addresses for avatars.
+    /// </summary>
+    public bool AllowPrivateAvatarIp { get; set; }
+
+    /// <summary>
+    ///     Whether to disable SSRF protection for avatar IP addresses.
+    /// </summary>
+    public bool DisableAvatarSsrfCheck { get; set; }
 }
 
 /// <summary>

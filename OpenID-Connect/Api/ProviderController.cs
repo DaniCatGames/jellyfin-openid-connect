@@ -55,7 +55,7 @@ public class ProviderController(
         PluginConfiguration configuration = OpenIDConnect.Instance.Configuration;
         configuration.Configs[provider] = config;
         OpenIDConnect.Instance.UpdateConfiguration(configuration);
-        
+
         logger.LogInformation("Added OIDC provider {provider}", provider);
         return Ok();
     }
@@ -80,7 +80,7 @@ public class ProviderController(
         }
 
         OpenIDConnect.Instance.UpdateConfiguration(configuration);
-        
+
         logger.LogInformation("Deleted OIDC provider {provider}", provider);
         return Ok();
     }
@@ -212,7 +212,7 @@ public class ProviderController(
         currentConfig.HasMigrated = true;
 
         OpenIDConnect.Instance.UpdateConfiguration(currentConfig);
-        
+
         logger.LogInformation("Migrated OIDC providers from 9p4 config");
 
         return Ok();

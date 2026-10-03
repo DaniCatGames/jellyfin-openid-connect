@@ -80,6 +80,12 @@ const oidcConfigurationPage = {
     loadConfiguration: (page) => {
         ApiClient.getPluginConfiguration(oidcConfigurationPage.pluginUniqueId).then((config) => {
             oidcConfigurationPage.renderProviderList(page, config.Configs || {});
+            const allowPrivateIp = page.querySelector("#GlobalAllowPrivateAvatarIp");
+            const disableSsrf = page.querySelector("#GlobalDisableAvatarSsrfCheck");
+            if (allowPrivateIp) allowPrivateIp.checked = !!config.AllowPrivateAvatarIp;
+            if (disableSsrf) disableSsrf.checked = !!config.DisableAvatarSsrfCheck;
+
+            oidcConfigurationPage.updateAvatarSecurityVisibility(page);
         });
 
         const folder_container = page.querySelector("#EnabledFolders");
@@ -89,6 +95,17 @@ const oidcConfigurationPage = {
         oidcConfigurationPage.populateUsers(user_container);
 
         oidcConfigurationPage.checkMigrationAvailable(page);
+    },
+
+    saveGlobalSettings: (page) => {
+        ApiClient.getPluginConfiguration(oidcConfigurationPage.pluginUniqueId).then((config) => {
+            config.AllowPrivateAvatarIp = page.querySelector("#GlobalAllowPrivateAvatarIp").checked;
+            config.DisableAvatarSsrfCheck = page.querySelector("#GlobalDisableAvatarSsrfCheck").checked;
+
+            ApiClient.updatePluginConfiguration(oidcConfigurationPage.pluginUniqueId, config).then((result) => {
+                Dashboard.processPluginConfigurationUpdateResult(result);
+            });
+        });
     },
 
     checkMigrationAvailable: (page) => {
@@ -605,6 +622,13 @@ const oidcConfigurationPage = {
             });
         });
     },
+
+    updateAvatarSecurityVisibility: (page) => {
+        const disableSsrf = page.querySelector("#GlobalDisableAvatarSsrfCheck").checked;
+        const privateIpContainer = page.querySelector("#Container-GlobalAllowPrivateAvatarIp");
+
+        privateIpContainer.style.display = disableSsrf ? "none" : "block";
+    },
 };
 
 export default function (view) {
@@ -732,6 +756,15 @@ export default function (view) {
 
     view.querySelector("#EnableLiveTvManagement").addEventListener("change", () => {
         oidcConfigurationPage.updateLiveTvVisibility(view);
+    });
+
+    view.querySelector("#GlobalAllowPrivateAvatarIp").addEventListener("change", () => {
+        oidcConfigurationPage.saveGlobalSettings(view);
+    });
+
+    view.querySelector("#GlobalDisableAvatarSsrfCheck").addEventListener("change", () => {
+        oidcConfigurationPage.updateAvatarSecurityVisibility(view);
+        oidcConfigurationPage.saveGlobalSettings(view);
     });
 
     ScopeManager.init(view);

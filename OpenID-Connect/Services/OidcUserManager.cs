@@ -137,6 +137,15 @@ public class OidcUserManager(
     }
 
     /// <inheritdoc />
+    public async Task UnregisterUser(User user, string provider)
+    {
+        user.AuthenticationProviderId = provider;
+        await userManager.UpdateUserAsync(user).ConfigureAwait(false);
+
+        linkManager.DeleteLinksToUser(user.Id);
+    }
+
+    /// <inheritdoc />
     public async Task<AuthenticationResult> AuthenticateUser(
         Guid userId,
         AuthResponse authResponse,
@@ -169,15 +178,6 @@ public class OidcUserManager(
         logger.LogInformation("Auth request created...");
 
         return await sessionManager.AuthenticateDirect(authRequest).ConfigureAwait(false);
-    }
-
-    /// <inheritdoc />
-    public async Task UnregisterUser(User user, string provider)
-    {
-        user.AuthenticationProviderId = provider;
-        await userManager.UpdateUserAsync(user).ConfigureAwait(false);
-
-        linkManager.DeleteLinksToUser(user.Id);
     }
 
     private async Task<User> CreateUserAndLink(string provider, string sub, string username, string authProvider)
@@ -280,8 +280,21 @@ public class OidcUserManager(
 
     private static HttpClient CreateClient()
     {
-        var policy = new AntiSSRFPolicy(PolicyConfigOptions.ExternalOnlyLatest);
-        var client = new HttpClient(policy.GetHandler());
+        HttpClient client;
+        if (OpenIDConnect.Instance.Configuration.DisableAvatarSsrfCheck)
+        {
+            client = new HttpClient();
+        }
+        else
+        {
+            var policy = new AntiSSRFPolicy(PolicyConfigOptions.ExternalOnlyLatest);
+            if (OpenIDConnect.Instance.Configuration.AllowPrivateAvatarIp)
+            {
+                policy.AddAllowedAddresses(IPAddressRanges.privateUse);
+            }
+
+            client = new HttpClient(policy.GetHandler());
+        }
 
         var assembly = Assembly.GetExecutingAssembly();
         FileVersionInfo fvi = FileVersionInfo.GetVersionInfo(assembly.Location);

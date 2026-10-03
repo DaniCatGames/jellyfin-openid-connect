@@ -56,6 +56,7 @@
                 </a>
                 to accomplish this.
             </div>
+
             <div id="oidc-dashboard-view">
                 <div class="oidc-dashboard-header">
                     <h3 class="sectionTitle" style="margin: 0;">Configured Providers</h3>
@@ -85,6 +86,40 @@
                     <span class="material-icons" style="vertical-align: middle; font-size: 1.2em;">sync</span>
                     Migrate providers from 9p4 plugin
                 </button>
+
+                <form class="esqConfigurationForm" style="margin-bottom: 2em;">
+                    <div class="verticalSection oidc-danger-section" style="max-width: 50em;">
+                        <h3 class="sectionTitle">User Avatar SSRF Protection</h3>
+                        <div class="collapseContent">
+                            <div class="checkboxContainer checkboxContainer-withDescription"
+                                 id="Container-GlobalDisableAvatarSsrfCheck" style="margin-bottom: 0;">
+                                <label>
+                                    <input class="emby-checkbox" id="GlobalDisableAvatarSsrfCheck" is="emby-checkbox"
+                                           type="checkbox"/>
+                                    <span>Disable Avatar SSRF Check</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    Disables Server-Side Request Forgery (SSRF) validation entirely when retrieving
+                                    avatar images across all providers.
+                                </div>
+                            </div>
+
+                            <div class="checkboxContainer checkboxContainer-withDescription"
+                                 id="Container-GlobalAllowPrivateAvatarIp"
+                                 style="display: none; margin-top: 1.5em; margin-bottom: 0;">
+                                <label>
+                                    <input class="emby-checkbox" id="GlobalAllowPrivateAvatarIp" is="emby-checkbox"
+                                           type="checkbox"/>
+                                    <span>Allow Private IP Addresses for Avatars</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    Allows avatar images to be fetched from private/internal network IP addresses across
+                                    all providers.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
             </div>
 
             <div id="oidc-editor-view" style="display: none;">
