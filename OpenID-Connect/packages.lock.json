@@ -35,9 +35,9 @@
       },
       "Microsoft.Security.AntiSSRF": {
         "type": "Direct",
-        "requested": "[1.0.0, )",
-        "resolved": "1.0.0",
-        "contentHash": "V0AJQt8FC5HXkvFhBqB0WgMADVL+vG+qiMK9p39OHdqfNwYOh1durk8j9rKPklWasBxpk8ifVdzoJmEgUWVoeg=="
+        "requested": "[1.0.1, )",
+        "resolved": "1.0.1",
+        "contentHash": "wred/odKPndZhHLWvoYGJMK82rzZ/fHF91CBil1reRyojXXDViXFhofIDoP8YukN1/UbICPs92wC9DCCLhI6LA=="
       },
       "Newtonsoft.Json": {
         "type": "Direct",
