@@ -15,7 +15,10 @@ using Jellyfin.Plugin.OpenIDConnect.Services;
 using Jellyfin.Plugin.OpenIDConnect.Views;
 using MediaBrowser.Common.Api;
 using MediaBrowser.Controller.Authentication;
+using MediaBrowser.Controller.Events;
+using MediaBrowser.Controller.Events.Authentication;
 using MediaBrowser.Controller.Library;
+using MediaBrowser.Controller.Session;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -39,7 +42,8 @@ public class OpenIDConnectController(
     IUserManager userManager,
     IHttpClientFactory httpClientFactory,
     IStateManager stateManager,
-    IOidcUserManager oidcUserManager
+    IOidcUserManager oidcUserManager,
+    IEventManager eventManager
 ) : ControllerBase
 {
     /// <summary>
@@ -370,6 +374,18 @@ public class OpenIDConnectController(
         if (userId == Guid.Empty)
         {
             stateManager.TryRemove(response.Data, out _);
+            logger.LogInformation("User {Username} failed to authenticate via {Provider}",
+                timedState.Username,
+                provider);
+            await eventManager.PublishAsync(new AuthenticationRequestEventArgs(new AuthenticationRequest
+            {
+                App = response.AppName,
+                AppVersion = response.AppVersion,
+                DeviceId = response.DeviceId,
+                DeviceName = response.DeviceName,
+                RemoteEndPoint = HttpContext.Connection.RemoteIpAddress?.ToString(),
+                Username = $"{timedState.Username} on {provider}",
+            }));
             return Unauthorized("User provisioning or linking with this user is disabled.");
         }
 
