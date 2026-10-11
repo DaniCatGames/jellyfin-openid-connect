@@ -39,12 +39,6 @@
         "resolved": "1.0.1",
         "contentHash": "wred/odKPndZhHLWvoYGJMK82rzZ/fHF91CBil1reRyojXXDViXFhofIDoP8YukN1/UbICPs92wC9DCCLhI6LA=="
       },
-      "Newtonsoft.Json": {
-        "type": "Direct",
-        "requested": "[13.0.4, )",
-        "resolved": "13.0.4",
-        "contentHash": "pdgNNMai3zv51W5aq268sujXUyx7SNdE2bj1wZcWjAQrKMFZV260lbqYop1d2GM67JI1huLRwxo9ZqnfF/lC6A=="
-      },
       "SerilogAnalyzer": {
         "type": "Direct",
         "requested": "[0.15.0, )",

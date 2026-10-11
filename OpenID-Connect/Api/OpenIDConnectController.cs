@@ -6,6 +6,7 @@ using System.Net.Http;
 using System.Net.Mime;
 using System.Reflection;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Duende.IdentityModel.OidcClient;
@@ -19,8 +20,6 @@ using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 namespace Jellyfin.Plugin.OpenIDConnect.Api;
 
@@ -235,13 +234,22 @@ public class OpenIDConnectController(
             {
                 try
                 {
-                    JToken currentToken = segments
-                        .Skip(1)
-                        .Aggregate(JToken.Parse(claim.Value), (current, segment) => current[segment]);
+                    using JsonDocument document = JsonDocument.Parse(claim.Value);
+                    JsonElement current = document.RootElement;
 
-                    if (currentToken is JArray rolesArray)
+                    bool found = true;
+                    foreach (string segment in segments.AsSpan(1))
                     {
-                        roles.AddRange(rolesArray.ToObject<List<string>>() ?? []);
+                        if (current.ValueKind != JsonValueKind.Object || !current.TryGetProperty(segment, out current))
+                        {
+                            found = false;
+                            break;
+                        }
+                    }
+
+                    if (found && current.ValueKind == JsonValueKind.Array)
+                    {
+                        roles.AddRange(current.Deserialize<List<string>>());
                     }
                     else
                     {
