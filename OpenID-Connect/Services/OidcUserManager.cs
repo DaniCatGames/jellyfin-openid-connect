@@ -48,7 +48,7 @@ public class OidcUserManager(
                 return linkedUser.Id;
             }
 
-            logger.LogWarning(
+            logger.LogError(
                 "OIDC user link exists between sub {sub} and jellyfin userId {userid}, but jellyfin user doesn't exist.",
                 timedState.Sub,
                 userId);
@@ -68,6 +68,8 @@ public class OidcUserManager(
         {
             if (!config.EnableUserProvisioning)
             {
+                logger.LogError("Tried to create a new user {Username}, but provisioning is disabled.",
+                    timedState.Username);
                 return Guid.Empty;
             }
 
@@ -99,7 +101,8 @@ public class OidcUserManager(
         // user exists but isnt in allowlist, so create a new one with an alt username
         if (!config.EnableUserProvisioning)
         {
-            logger.LogInformation("OIDC user {Username} has no matching jellyfin user, but provisioning is disabled.",
+            logger.LogInformation(
+                "OIDC user {Username} has no linked jellyfin user, tried to create a new user but provisioning is disabled.",
                 timedState.Username);
             return Guid.Empty;
         }
@@ -118,7 +121,7 @@ public class OidcUserManager(
             if (newUser != null)
             {
                 logger.LogWarning(
-                    "OIDC user {Username} already exists, and a users already exists with the username {Existing}. Not creating a new user.",
+                    "OIDC user {Username} already exists, and a user already exists with the username {Existing}. Not creating a new user.",
                     timedState.Username,
                     newUsername);
                 return Guid.Empty;
@@ -142,6 +145,9 @@ public class OidcUserManager(
         user.AuthenticationProviderId = provider;
         await userManager.UpdateUserAsync(user).ConfigureAwait(false);
 
+        logger.LogInformation("User {Username} unregistered, moved to authentication provider {AuthProvider}.",
+            user.Username,
+            provider);
         linkManager.DeleteLinksToUser(user.Id);
     }
 
@@ -175,7 +181,6 @@ public class OidcUserManager(
             DeviceName = authResponse.DeviceName,
             RemoteEndPoint = ipAddress,
         };
-        logger.LogInformation("Auth request created...");
 
         return await sessionManager.AuthenticateDirect(authRequest).ConfigureAwait(false);
     }
@@ -191,6 +196,10 @@ public class OidcUserManager(
         await userManager.UpdateUserAsync(user).ConfigureAwait(false);
 
         linkManager.TryCreateLink(provider, sub, user.Id);
+        logger.LogInformation("Created user {Username} and linked it to sub {Sub} via {Provider}",
+            username,
+            sub,
+            provider);
         return user;
     }
 

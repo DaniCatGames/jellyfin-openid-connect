@@ -136,6 +136,8 @@ public class ProviderController(
             return BadRequest("No old config to migrate from");
         }
 
+        logger.LogInformation("Migrating OIDC providers from 9p4 config");
+
         SsoAuthConfig oldConfig;
         var serializer = new XmlSerializer(typeof(SsoAuthConfig));
 
@@ -207,6 +209,8 @@ public class ProviderController(
             };
 
             currentConfig.Configs[name] = newConfig;
+
+            logger.LogInformation("Migrated OIDC provider {provider}", name);
         }
 
         currentConfig.HasMigrated = true;

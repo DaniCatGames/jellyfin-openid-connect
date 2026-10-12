@@ -17,4 +17,5 @@ artifacts:
   - "Microsoft.Security.AntiSSRF.dll"
 changelog: |-
   - Replace Newtonsoft.Json with System.Text.Json
+  - Improve logging and error handling
   - Log failed login attempts to Jellyfin activity dashboard
