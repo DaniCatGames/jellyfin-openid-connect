@@ -23,7 +23,7 @@ public static class WebResponse
         }
 
         var assembly = Assembly.GetExecutingAssembly();
-        const string flowhtml = "Jellyfin.Plugin.OpenIDConnect.Views.flow.html"; // Adjust namespace if necessary
+        const string flowhtml = "Jellyfin.Plugin.OpenIDConnect.Views.flow.html";
 
         using Stream stream = assembly.GetManifestResourceStream(flowhtml);
         if (stream == null)

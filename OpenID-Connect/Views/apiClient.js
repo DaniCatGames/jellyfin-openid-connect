@@ -1,8 +1,8 @@
-import jellyfinApiclient from "./jellyfin-apiClient.esm.min.js";
+import api from "./api.js";
 import { getDeviceName, sleep } from "./shared.js";
 
-window.jellyfinApiclient = jellyfinApiclient;
-console.log(jellyfinApiclient);
+window.jellyfinApiclient = api;
+console.log(api);
 
 // https://github.com/jellyfin/jellyfin-web/blob/9067b0e397cc8b38635d661ce86ddd83194f3202/src/scripts/clientUtils.js#L19-L76
 export async function serverAddress({ basePath = "/web" }) {
@@ -98,7 +98,7 @@ await awaitLocalStorage();
 
 // Fetch credentials
 
-const credentials = new jellyfinApiclient.Credentials();
+const credentials = new api.Credentials();
 
 const server = await serverAddress({ basePath: "/OpenIDConnectViews" });
 
@@ -108,43 +108,14 @@ const activeServerId = serverInfo.Id;
 
 console.log({ server: server });
 const deviceId = getDeviceId();
-const appName = "Jellyfin%20Web";
+const appName = "Jellyfin Web";
 const appVersion = serverInfo.Version;
-const capabilities = {};
 
 const current_server = credentials.credentials().Servers.find((e) => e.Id === activeServerId) || {};
 
-const localApiClient = new jellyfinApiclient.ApiClient(server, appName, appVersion, getDeviceName(), deviceId);
-
-localApiClient.enableAutomaticBitrateDetection = false;
+const localApiClient = new api.ApiClient(server, appName, appVersion, getDeviceName(), deviceId);
 
 localApiClient.setAuthenticationInfo(current_server.AccessToken, current_server.UserId);
-
-const connections = new jellyfinApiclient.ConnectionManager(
-    credentials,
-    appName,
-    appVersion,
-    getDeviceName(),
-    deviceId,
-    capabilities,
-);
-
-//fix old authorization headers so the server accepts our requests
-localApiClient.setRequestHeaders = function (headers) {
-    const token = current_server.AccessToken;
-
-    const parts = [
-        `Client="${appName}"`,
-        `Device="${getDeviceName()}"`,
-        `DeviceId="${deviceId}"`,
-        `Version="${appVersion}"`,
-        `Token="${token}"`,
-    ];
-
-    headers["Authorization"] = `MediaBrowser ${parts.join(", ")}`;
-};
-
-connections.addApiClient(localApiClient);
 
 window.ApiClient = localApiClient;
 
