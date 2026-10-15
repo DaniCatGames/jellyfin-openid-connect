@@ -783,6 +783,14 @@
                 "sourceUrl": "https://github.com/DaniCatGames/jellyfin-openid-connect/releases/download/unstable/openid-connect_1.2607.3.0.zip",
                 "checksum": "a0eb9f45e5ce8988cfcf61eca4dfeffa",
                 "timestamp": "2026-07-12T09:49:52Z"
+            },
+            {
+                "version": "1.0.1.104",
+                "changelog": "- Replace Newtonsoft.Json with System.Text.Json\n- Improve logging and error handling\n- Log failed login attempts to Jellyfin activity dashboard",
+                "targetAbi": "12.0.0",
+                "sourceUrl": "https://github.com/DaniCatGames/jellyfin-openid-connect/releases/download/unstable/openid-connect_1.0.1.104.zip",
+                "checksum": "bdc68567a23e8a11d7792ced9eb657ab",
+                "timestamp": "2026-10-15T20:38:15Z"
             }
         ]
     }
