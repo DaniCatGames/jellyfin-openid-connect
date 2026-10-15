@@ -1,26 +1,14 @@
 using System;
-using System.Net.Http;
 using System.Threading.Tasks;
 using Jellyfin.Database.Implementations.Entities;
 using Jellyfin.Plugin.OpenIDConnect.Api;
 using MediaBrowser.Controller.Authentication;
-using MediaBrowser.Controller.Configuration;
-using MediaBrowser.Controller.Library;
-using MediaBrowser.Controller.Providers;
-using MediaBrowser.Controller.Session;
-using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.OpenIDConnect.Services;
 
 /// <summary>
 ///     The OIDC user manager.
 /// </summary>
-/// <param name="logger">Instance of the <see cref="ILogger{TCategoryName}" /> interface.</param>
-/// <param name="userManager">Instance of the <see cref="IUserManager" /> interface.</param>
-/// <param name="sessionManager">Instance of the <see cref="ISessionManager" /> interface.</param>
-/// <param name="providerManager">Instance of the <see cref="IProviderManager" /> interface.</param>
-/// <param name="serverConfigurationManager">Instance of the <see cref="IServerConfigurationManager" /> interface.</param>
-/// <param name="httpClientFactory">Instance of the <see cref="IHttpClientFactory" /> interface.</param>
 public interface IOidcUserManager
 {
     /// <summary>

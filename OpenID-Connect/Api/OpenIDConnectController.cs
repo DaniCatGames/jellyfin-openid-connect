@@ -34,6 +34,8 @@ namespace Jellyfin.Plugin.OpenIDConnect.Api;
 /// <param name="userManager">Instance of the <see cref="IUserManager" /> interface.</param>
 /// <param name="httpClientFactory">Instance of the <see cref="IHttpClientFactory" /> interface.</param>
 /// <param name="stateManager">Instance of the <see cref="IStateManager" /> interface.</param>
+/// <param name="oidcUserManager">Instance of the <see cref="IOidcUserManager" /> interface.</param>
+/// <param name="eventManager">Instance of the <see cref="IEventManager" /> interface.</param>
 [ApiController]
 [Route("[controller]")]
 public class OpenIDConnectController(

@@ -17,6 +17,7 @@ namespace Jellyfin.Plugin.OpenIDConnect.Api;
 /// <param name="authContext">Instance of the <see cref="IAuthorizationContext" /> interface.</param>
 /// <param name="linkManager">Instance of the <see cref="ILinkManager" /> interface.</param>
 /// <param name="stateManager">Instance of the <see cref="IStateManager" /> interface.</param>
+/// <param name="logger">Instance of the <see cref="ILogger" /> interface.</param>
 [ApiController]
 [Route("OpenIDConnect")]
 public class LinkController(
@@ -80,8 +81,11 @@ public class LinkController(
         {
             return BadRequest("Error. Check server logs.");
         }
-        
-        logger.LogInformation("User {Username} linked to jellyfin user {UserId} via {Provider}", timedState.Username, jellyfinUserId, provider);
+
+        logger.LogInformation("User {Username} linked to jellyfin user {UserId} via {Provider}",
+            timedState.Username,
+            jellyfinUserId,
+            provider);
 
         return NoContent();
     }
@@ -138,8 +142,11 @@ public class LinkController(
         {
             return BadRequest("Error. Check server logs.");
         }
-        
-        logger.LogInformation("User {Sub} unlinked from jellyfin user {UserId} via {Provider}", sub, jellyfinUserId, provider);
+
+        logger.LogInformation("User {Sub} unlinked from jellyfin user {UserId} via {Provider}",
+            sub,
+            jellyfinUserId,
+            provider);
 
         return NoContent();
     }
