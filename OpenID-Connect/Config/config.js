@@ -1,17 +1,92 @@
+// ============ 1. Constants + helpers ============
+
+const PLUGIN_ID = "3b621017-67a3-461e-a820-21622c591827";
+const OIDC_AUTH_PROVIDER_TYPE = "Jellyfin.Plugin.OpenIDConnect.AuthProvider";
+const FOLDER_LIST_FIELD = "EnabledFolders";
+const ROLE_MAP_FIELD = "FolderRoleMapping";
+
+// Module-level state persists across SPA navigations; reset on every activation.
 let dirty = false;
+let configPromise = null;
+let foldersPromise = null;
+let writeQueue = Promise.resolve();
+let editingName = "";
+
+const q = (view, selector) => view.querySelector(selector);
+
+const folderEntries = (folders) => folders.Items.map((f) => ({ id: f.Id, name: f.Name }));
+
+// ============ 2. Config access ============
+
+function getConfig() {
+    configPromise ||= ApiClient.getPluginConfiguration(PLUGIN_ID);
+    return configPromise;
+}
+
+// All writes run through a serialized read-modify-write queue. The plugin
+// configuration is replaced as a whole object server-side, so concurrent
+// saves (e.g. two toggles flipped quickly) must not interleave, or one
+// write silently reverts the other. `mutate` returns false to abort.
+function updateConfig(mutate) {
+    const request = writeQueue.then(async () => {
+        const config = await ApiClient.getPluginConfiguration(PLUGIN_ID); // always fresh for writes
+        if (mutate(config) === false) return null;
+        const result = await ApiClient.updatePluginConfiguration(PLUGIN_ID, config);
+        configPromise = null; // next read refetches
+        return result;
+    });
+    writeQueue = request.catch(() => {}); // keep the queue alive after failures
+    return request;
+}
+
+function getFolders() {
+    foldersPromise ||= ApiClient.getJSON(ApiClient.getUrl("Library/MediaFolders", { IsHidden: false }));
+    return foldersPromise;
+}
+
+// ============ 3. Visibility engine ============
+
+const attrIds = (node, attr) => (node.getAttribute(attr) || "").trim().split(/\s+/).filter(Boolean);
+
+function applyVisibility(view) {
+    const checked = (id) => q(view, `#${CSS.escape(id)}`)?.checked;
+
+    for (const node of view.querySelectorAll("[data-hide-if], [data-hide-unless]")) {
+        const hide =
+            (node.hasAttribute("data-hide-if") && attrIds(node, "data-hide-if").every(checked)) ||
+            (node.hasAttribute("data-hide-unless") && attrIds(node, "data-hide-unless").some((id) => !checked(id)));
+        node.style.display = hide ? "none" : "";
+    }
+}
+
+function wireVisibility(view) {
+    const triggers = new Set();
+    for (const node of view.querySelectorAll("[data-hide-if], [data-hide-unless]")) {
+        for (const attr of ["data-hide-if", "data-hide-unless"]) {
+            if (node.hasAttribute(attr)) attrIds(node, attr).forEach((id) => triggers.add(id));
+        }
+    }
+    for (const id of triggers) {
+        q(view, `#${CSS.escape(id)}`)?.addEventListener("change", () => applyVisibility(view));
+    }
+    applyVisibility(view);
+}
+
+// ============ 4. Scope tag editor ============
+
+const FIXED_SCOPES = ["openid", "profile"];
 
 const ScopeManager = {
     tags: [],
-    fixedTags: ["openid", "profile"],
 
-    init: function (page) {
-        this.container = page.querySelector("#ScopesTagUI");
-        this.input = page.querySelector("#ScopesTagInput");
+    init(view) {
+        this.container = q(view, "#ScopesTagUI");
+        this.input = q(view, "#ScopesTagInput");
 
         this.input.addEventListener("keydown", (e) => {
             if (["Enter", " ", ","].includes(e.key)) {
                 e.preventDefault();
-                this.addTag(this.input.value);
+                this.add(this.input.value);
             } else if (e.key === "Backspace" && this.input.value === "" && this.tags.length > 0) {
                 this.tags.pop();
                 this.render();
@@ -19,753 +94,512 @@ const ScopeManager = {
             }
         });
 
-        this.container.addEventListener("click", () => this.input.focus());
+        this.container.addEventListener("click", (e) => {
+            if (!e.target.closest(".oidc-tag-remove")) this.input.focus();
+        });
     },
 
-    addTag: function (value) {
-        const cleanTag = value.trim().toLowerCase();
-        if (cleanTag === "" || this.tags.includes(cleanTag) || this.fixedTags.includes(cleanTag)) {
+    add(value) {
+        const tag = value.trim().toLowerCase();
+        if (!tag || this.tags.includes(tag) || FIXED_SCOPES.includes(tag)) {
             this.input.value = "";
             return;
         }
-        this.tags.push(cleanTag);
+        this.tags.push(tag);
         this.input.value = "";
         this.render();
         dirty = true;
     },
 
-    render: function () {
-        // Clear dynamic tags
-        this.container.querySelectorAll(".oidc-tag:not(.oidc-tag-fixed)").forEach((el) => el.remove());
-
-        this.tags.forEach((tag) => {
-            const span = document.createElement("span");
-            span.className = "oidc-tag";
-            span.innerHTML = `${tag} <span class="oidc-tag-remove" data-tag="${tag}">&times;</span>`;
-
-            span.querySelector(".oidc-tag-remove").addEventListener("click", () => {
-                this.tags = this.tags.filter((t) => t !== tag);
-                this.render();
-                dirty = true;
-            });
-
-            this.container.insertBefore(span, this.input);
-        });
+    remove(tag) {
+        this.tags = this.tags.filter((t) => t !== tag);
+        this.render();
+        dirty = true;
     },
 
-    get: function () {
+    render() {
+        this.container.querySelectorAll(".oidc-tag:not(.oidc-tag-fixed)").forEach((n) => n.remove());
+        for (const tag of this.tags) {
+            const chip = document.createElement("span");
+            chip.className = "oidc-tag";
+            chip.append(document.createTextNode(tag));
+
+            const remove = document.createElement("span");
+            remove.className = "oidc-tag-remove";
+            remove.title = `Remove ${tag}`;
+            remove.textContent = "×";
+            remove.addEventListener("click", () => this.remove(tag));
+
+            chip.append(remove);
+            this.container.insertBefore(chip, this.input);
+        }
+    },
+
+    get() {
         return this.tags;
     },
 
-    set: function (newTags) {
-        // Filter out nulls and fixed tags from incoming data
-        this.tags = (newTags || []).filter((t) => t && !this.fixedTags.includes(t));
+    set(tags) {
+        this.tags = (tags || []).filter((t) => t && !FIXED_SCOPES.includes(t));
         this.render();
     },
 };
 
-const oidcConfigurationPage = {
-    pluginUniqueId: "3b621017-67a3-461e-a820-21622c591827",
+// ============ 5. Rendering ============
 
-    showDashboard: (page) => {
-        page.querySelector("#oidc-editor-view").style.display = "none";
-        page.querySelector("#oidc-dashboard-view").style.display = "block";
-    },
+function showDashboard(view) {
+    q(view, "#oidc-editor-view").style.display = "none";
+    q(view, "#oidc-dashboard-view").style.display = "block";
+}
 
-    showEditor: (page) => {
-        page.querySelector("#oidc-dashboard-view").style.display = "none";
-        page.querySelector("#oidc-editor-view").style.display = "block";
-    },
+function showEditor(view) {
+    q(view, "#oidc-dashboard-view").style.display = "none";
+    q(view, "#oidc-editor-view").style.display = "block";
+}
 
-    loadConfiguration: (page) => {
-        ApiClient.getPluginConfiguration(oidcConfigurationPage.pluginUniqueId).then((config) => {
-            oidcConfigurationPage.renderProviderList(page, config.Configs || {});
-            const allowPrivateIp = page.querySelector("#GlobalAllowPrivateAvatarIp");
-            const disableSsrf = page.querySelector("#GlobalDisableAvatarSsrfCheck");
-            if (allowPrivateIp) allowPrivateIp.checked = !!config.AllowPrivateAvatarIp;
-            if (disableSsrf) disableSsrf.checked = !!config.DisableAvatarSsrfCheck;
+function renderProviderList(view, providers) {
+    const list = q(view, "#oidc-provider-list");
+    const names = Object.keys(providers);
+    list.replaceChildren();
+    q(view, "#oidc-empty-state").style.display = names.length ? "none" : "";
 
-            oidcConfigurationPage.updateAvatarSecurityVisibility(page);
+    for (const name of names) {
+        const provider = providers[name];
+        const enabled = provider.Enabled !== false;
+        const endpoint = provider.Endpoint || "";
+
+        const item = q(view, "#tpl-provider-item").content.firstElementChild.cloneNode(true);
+        item.dataset.provider = name;
+
+        const icon = item.querySelector(".oidc-provider-list-icon");
+        icon.textContent = enabled ? "check_circle" : "remove_circle";
+        icon.style.color = enabled ? "var(--emphasis, #00a4dc)" : "#666";
+
+        item.querySelector(".oidc-provider-list-name").textContent = name;
+
+        const endpointSpan = item.querySelector(".oidc-provider-list-endpoint");
+        endpointSpan.textContent = endpoint || "No endpoint set";
+        endpointSpan.title = endpoint;
+
+        const status = item.querySelector(".oidc-provider-list-status");
+        status.textContent = enabled ? "Enabled" : "Disabled";
+        status.classList.add(enabled ? "enabled" : "disabled");
+
+        item.querySelector(".oidc-provider-list-delete").title = `Delete ${name}`;
+        list.append(item);
+    }
+}
+
+// Generic checkbox list (libraries, users) cloned from #tpl-check-item.
+function renderCheckList(view, container, entries, valueKey, selected = [], inputClass) {
+    container.replaceChildren();
+    for (const entry of entries) {
+        const node = q(view, "#tpl-check-item").content.firstElementChild.cloneNode(true);
+        const input = node.querySelector("input");
+        input.className = inputClass;
+        input.dataset[valueKey] = entry.id;
+        input.checked = selected.includes(entry.id);
+        node.querySelector("span").textContent = entry.name;
+        container.append(node);
+    }
+}
+
+function renderRoleMappings(view, container, mappings, folders) {
+    container.replaceChildren();
+    for (const mapping of mappings) {
+        const node = q(view, "#tpl-role-mapping").content.firstElementChild.cloneNode(true);
+        node.querySelector(".oidc-role-mapping-name").value = mapping.Role || "";
+        renderCheckList(
+            view,
+            node.querySelector(".oidc-folder-list"),
+            folderEntries(folders),
+            "id",
+            mapping.Folders || [],
+            "folder-checkbox chkFolder",
+        );
+        container.append(node);
+    }
+}
+
+async function populateUsers(view) {
+    const users = await ApiClient.getUsers();
+    renderCheckList(
+        view,
+        q(view, "#AutoLinkingAllowList"),
+        users.map((u) => ({ id: u.Name, name: u.Name })),
+        "username",
+        [],
+        "user-checkbox",
+    );
+}
+
+async function populateAuthProviders(view) {
+    const providers = await ApiClient.getJSON(ApiClient.getUrl("OpenIDConnect/AuthProviders"));
+    const select = q(view, "#DefaultAuthProvider");
+    select.replaceChildren();
+    for (const provider of providers) {
+        const option = document.createElement("option");
+        option.value = provider.Type;
+        option.textContent = provider.Name;
+        select.append(option);
+    }
+}
+
+function setAuthProviderValue(select, value) {
+    const options = [...select.options];
+    const match = options.find((o) => o.value === value);
+    const fallback = options.find((o) => o.value === OIDC_AUTH_PROVIDER_TYPE) || options[0];
+    select.value = (match || fallback)?.value ?? "";
+}
+
+function addStylesheet(view) {
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = `${ApiClient.getUrl("web/configurationpage")}?name=openid-connect.css`;
+    view.append(link);
+}
+
+// ============ 6. Load / save / delete / migration ============
+
+// Form fields are discovered by class; every id doubles as the config key.
+function listFields(view) {
+    const form = q(view, "#oidc-provider-form");
+    const idsOf = (selector) => [...form.querySelectorAll(selector)].map((e) => e.id);
+    return {
+        text: idsOf(".oidc-text"),
+        textList: idsOf(".oidc-line-list"),
+        check: idsOf(".oidc-toggle"),
+        select: idsOf(".oidc-select"),
+        folderList: [FOLDER_LIST_FIELD],
+        roleMap: [ROLE_MAP_FIELD],
+    };
+}
+
+function parseTextList(element) {
+    return element.value
+        .split("\n")
+        .map((s) => s.trim())
+        .filter(Boolean);
+}
+
+function serializeEnabledFolders(container) {
+    return [...container.querySelectorAll(".folder-checkbox")].filter((cb) => cb.checked).map((cb) => cb.dataset.id);
+}
+
+function serializeRoleMappings(container) {
+    return [...container.querySelectorAll(".oidc-role-mapping-container")].map((node) => ({
+        Role: node.querySelector(".oidc-role-mapping-name").value,
+        Folders: serializeEnabledFolders(node.querySelector(".oidc-folder-list")),
+    }));
+}
+
+async function loadConfiguration(view) {
+    try {
+        const config = await getConfig();
+        renderProviderList(view, config.Configs || {});
+        q(view, "#GlobalAllowPrivateAvatarIp").checked = !!config.AllowPrivateAvatarIp;
+        q(view, "#GlobalDisableAvatarSsrfCheck").checked = !!config.DisableAvatarSsrfCheck;
+        applyVisibility(view); // private-IP field depends on the SSRF toggle
+    } catch {
+        Dashboard.alert("Failed to load plugin configuration.");
+    }
+
+    try {
+        const folders = await getFolders();
+        renderCheckList(
+            view,
+            q(view, `#${FOLDER_LIST_FIELD}`),
+            folderEntries(folders),
+            "id",
+            [],
+            "folder-checkbox chkFolder",
+        );
+    } catch {
+        Dashboard.alert("Failed to load library list.");
+    }
+
+    populateUsers(view).catch(() => Dashboard.alert("Failed to load user list."));
+    checkMigrationAvailable(view);
+}
+
+async function loadProvider(view, name) {
+    const config = await getConfig();
+    const provider = config.Configs[name] || {};
+    const fields = listFields(view);
+
+    q(view, "#ProviderName").value = name;
+    ScopeManager.set(provider.Scopes);
+
+    // Always assign (with fallbacks) so server-side-cleared values clear the form too.
+    for (const id of fields.text) q(view, `#${id}`).value = provider[id] ?? "";
+    for (const id of fields.textList) q(view, `#${id}`).value = (provider[id] || []).join("\r\n");
+    for (const id of fields.select) setAuthProviderValue(q(view, `#${id}`), provider[id]);
+    for (const id of fields.check) {
+        if (provider[id] !== undefined) q(view, `#${id}`).checked = !!provider[id];
+    }
+
+    const folders = await getFolders();
+    for (const id of fields.folderList) {
+        renderCheckList(
+            view,
+            q(view, `#${id}`),
+            folderEntries(folders),
+            "id",
+            provider[id] || [],
+            "folder-checkbox chkFolder",
+        );
+    }
+    for (const id of fields.roleMap) {
+        renderRoleMappings(view, q(view, `#${id}`), provider[id] || [], folders);
+    }
+
+    for (const cb of q(view, "#AutoLinkingAllowList").querySelectorAll(".user-checkbox")) {
+        cb.checked = !!provider.AutoLinkingAllowList?.includes(cb.dataset.username);
+    }
+
+    applyVisibility(view);
+    dirty = false;
+}
+
+function clearForm(view) {
+    q(view, "#ProviderName").value = "";
+    const form = q(view, "#oidc-provider-form");
+
+    form.querySelectorAll(".oidc-text").forEach((input) => (input.value = ""));
+    form.querySelectorAll(".oidc-line-list").forEach((textarea) => (textarea.value = ""));
+    form.querySelectorAll(".oidc-toggle").forEach((cb) => (cb.checked = cb.id === "Enabled"));
+    form.querySelectorAll(".oidc-select").forEach((select) => setAuthProviderValue(select, OIDC_AUTH_PROVIDER_TYPE));
+
+    q(view, `#${FOLDER_LIST_FIELD}`)
+        .querySelectorAll(".folder-checkbox")
+        .forEach((cb) => (cb.checked = false));
+    q(view, `#${ROLE_MAP_FIELD}`).replaceChildren();
+    q(view, "#AutoLinkingAllowList")
+        .querySelectorAll(".user-checkbox")
+        .forEach((cb) => (cb.checked = false));
+
+    ScopeManager.set([]);
+    applyVisibility(view);
+    dirty = false;
+}
+
+async function openEditor(view, name) {
+    showEditor(view);
+    await populateAuthProviders(view);
+
+    editingName = name;
+
+    const badge = q(view, "#oidc-editor-mode-badge");
+    if (name) {
+        badge.textContent = "EDIT";
+        badge.className = "oidc-mode-badge oidc-mode-edit";
+        q(view, "#oidc-editor-provider-name-display").textContent = name;
+        await loadProvider(view, name);
+    } else {
+        badge.textContent = "NEW";
+        badge.className = "oidc-mode-badge oidc-mode-new";
+        q(view, "#oidc-editor-provider-name-display").textContent = "New Provider";
+        clearForm(view);
+    }
+}
+
+function saveGlobalSettings(view) {
+    const allowPrivateIp = q(view, "#GlobalAllowPrivateAvatarIp").checked;
+    const disableSsrf = q(view, "#GlobalDisableAvatarSsrfCheck").checked;
+
+    updateConfig((config) => {
+        config.AllowPrivateAvatarIp = allowPrivateIp;
+        config.DisableAvatarSsrfCheck = disableSsrf;
+    })
+        .then((result) => Dashboard.processPluginConfigurationUpdateResult(result))
+        .catch(() => Dashboard.alert("Failed to save global settings."));
+}
+
+async function saveProvider(view) {
+    // Native constraint validation (required fields, provider-name pattern).
+    if (!q(view, "#ProviderName").reportValidity()) return false;
+
+    const name = q(view, "#ProviderName").value.trim();
+    const fields = listFields(view);
+    const provider = {};
+
+    for (const id of fields.text) provider[id] = q(view, `#${id}`).value || null;
+    for (const id of fields.check) provider[id] = q(view, `#${id}`).checked;
+    for (const id of fields.textList) provider[id] = parseTextList(q(view, `#${id}`));
+    for (const id of fields.select) provider[id] = q(view, `#${id}`).value || null;
+    for (const id of fields.folderList) provider[id] = serializeEnabledFolders(q(view, `#${id}`));
+    for (const id of fields.roleMap) provider[id] = serializeRoleMappings(q(view, `#${id}`));
+    provider.AutoLinkingAllowList = [...q(view, "#AutoLinkingAllowList").querySelectorAll(".user-checkbox")]
+        .filter((cb) => cb.checked)
+        .map((cb) => cb.dataset.username);
+    provider.Scopes = ScopeManager.get();
+
+    try {
+        // Merge over the existing entry so server-side-only fields survive.
+        const result = await updateConfig((config) => {
+            if (name !== editingName && Object.hasOwn(config.Configs, name)) {
+                alert(`Provider "${name}" already exists.`);
+                return false;
+            }
+            const merged = { ...(config.Configs[editingName] || {}), ...provider };
+            if (name !== editingName) delete config.Configs[editingName];
+            config.Configs[name] = merged;
         });
-
-        const folder_container = page.querySelector("#EnabledFolders");
-        oidcConfigurationPage.populateFolders(folder_container);
-
-        const user_container = page.querySelector("#AutoLinkingAllowList");
-        oidcConfigurationPage.populateUsers(user_container);
-
-        oidcConfigurationPage.checkMigrationAvailable(page);
-    },
-
-    saveGlobalSettings: (page) => {
-        ApiClient.getPluginConfiguration(oidcConfigurationPage.pluginUniqueId).then((config) => {
-            config.AllowPrivateAvatarIp = page.querySelector("#GlobalAllowPrivateAvatarIp").checked;
-            config.DisableAvatarSsrfCheck = page.querySelector("#GlobalDisableAvatarSsrfCheck").checked;
-
-            ApiClient.updatePluginConfiguration(oidcConfigurationPage.pluginUniqueId, config).then((result) => {
-                Dashboard.processPluginConfigurationUpdateResult(result);
-            });
-        });
-    },
-
-    checkMigrationAvailable: (page) => {
-        const migrateBtn = page.querySelector("#oidc-migrate-btn");
-        ApiClient.getJSON(ApiClient.getUrl("OpenIDConnect/Providers/MigrationAvailable"))
-            .then((available) => {
-                migrateBtn.style.display = available ? "" : "none";
-            })
-            .catch(() => {
-                migrateBtn.style.display = "none";
-            });
-    },
-
-    renderProviderList: (page, providers) => {
-        const list = page.querySelector("#oidc-provider-list");
-        const providerNames = Object.keys(providers);
-
-        list.querySelectorAll(".oidc-provider-list-item, .oidc-empty-state").forEach((e) => e.remove());
-
-        if (providerNames.length === 0) {
-            const empty = document.createElement("div");
-            empty.className = "oidc-empty-state";
-            empty.innerHTML = `
-            <div class="material-icons">vpn_key</div>
-            <p><strong>No providers configured yet.</strong></p>
-            <p>Click "Add Provider" below to get started.</p>
-        `;
-            list.appendChild(empty);
-            return;
-        }
-
-        providerNames.forEach((name) => {
-            const provider = providers[name];
-            const item = document.createElement("div");
-            item.className = "oidc-provider-list-item";
-            item.setAttribute("data-provider", name);
-
-            const isEnabled = provider.Enabled !== false;
-            const endpoint = provider.Endpoint || "";
-            const iconColor = isEnabled ? "var(--emphasis, #00a4dc)" : "#666";
-
-            item.innerHTML = `
-            <span class="oidc-provider-list-icon material-icons" style="color: ${iconColor};">
-                ${isEnabled ? "check_circle" : "remove_circle"}
-            </span>
-            <span class="oidc-provider-list-name">${name}</span>
-            <span class="oidc-provider-list-endpoint" title="${endpoint}">
-                ${endpoint || "No endpoint set"}
-            </span>
-            <span class="oidc-provider-list-status ${isEnabled ? "enabled" : "disabled"}">
-                ${isEnabled ? "Enabled" : "Disabled"}
-            </span>
-            <button class="oidc-provider-list-delete" title="Delete ${name}" data-provider="${name}">
-                <span class="material-icons" style="font-size: 1.1em;">close</span>
-            </button>
-        `;
-
-            item.addEventListener("click", (e) => {
-                if (e.target.closest(".oidc-provider-list-delete")) return;
-                oidcConfigurationPage.openEditor(page, name);
-            });
-
-            item.querySelector(".oidc-provider-list-delete").addEventListener("click", (e) => {
-                e.stopPropagation();
-                oidcConfigurationPage.deleteProvider(page, name);
-            });
-
-            list.appendChild(item);
-        });
-    },
-    openEditor: (page, providerName) => {
-        oidcConfigurationPage.showEditor(page);
-
-        const titleDisplay = page.querySelector("#oidc-editor-provider-name-display");
-        const modeBadge = page.querySelector("#oidc-editor-mode-badge");
-
-        const authSelect = page.querySelector("#DefaultAuthProvider");
-
-        if (providerName) {
-            modeBadge.textContent = "EDIT";
-            modeBadge.className = "oidc-mode-badge oidc-mode-edit";
-            titleDisplay.textContent = providerName;
-            // Populate dropdown first, then load the saved value
-            oidcConfigurationPage.populateAuthProviders(authSelect).then(() => {
-                const oidcOption = [...authSelect.options].find(
-                    (o) => o.value === "Jellyfin.Plugin.OpenIDConnect.AuthProvider",
-                );
-                if (oidcOption) {
-                    authSelect.value = oidcOption.value;
-                } else if (authSelect.options.length > 0) {
-                    authSelect.selectedIndex = 0;
-                }
-                oidcConfigurationPage.loadProvider(page, providerName);
-            });
-        } else {
-            modeBadge.textContent = "NEW";
-            modeBadge.className = "oidc-mode-badge oidc-mode-new";
-            titleDisplay.textContent = "New Provider";
-            // Populate dropdown first, then clear form (so OIDC option exists to select)
-            oidcConfigurationPage.populateAuthProviders(authSelect).then(() => {
-                oidcConfigurationPage.clearForm(page);
-            });
-        }
-    },
-    clearForm: (page) => {
+        Dashboard.processPluginConfigurationUpdateResult(result);
         dirty = false;
+        loadConfiguration(view);
+        showDashboard(view);
+        return true;
+    } catch {
+        Dashboard.alert(`Failed to save provider "${name}".`);
+        return false;
+    }
+}
 
-        const form = page.querySelector("#oidc-new-oidc-provider");
+async function deleteProvider(view, name) {
+    if (!window.confirm(`Are you sure you want to delete "${name}"? This cannot be undone.`)) return;
 
-        form.querySelectorAll(".oidc-text").forEach((input) => {
-            input.value = "";
+    try {
+        const result = await updateConfig((config) => {
+            if (!Object.hasOwn(config.Configs, name)) return false;
+            delete config.Configs[name];
+            return true;
         });
-
-        form.querySelectorAll(".oidc-line-list").forEach((textarea) => {
-            textarea.value = "";
-        });
-
-        form.querySelectorAll(".oidc-toggle").forEach((checkbox) => {
-            checkbox.checked = checkbox.id === "Enabled";
-        });
-
-        form.querySelectorAll(".oidc-select").forEach((select) => {
-            const oidcOption = [...select.options].find(
-                (o) => o.value === "Jellyfin.Plugin.OpenIDConnect.AuthProvider",
-            );
-            if (oidcOption) {
-                select.value = oidcOption.value;
-            } else if (select.options.length > 0) {
-                select.selectedIndex = 0;
-            }
-        });
-
-        const folderContainer = page.querySelector("#EnabledFolders");
-        folderContainer.querySelectorAll(".folder-checkbox").forEach((cb) => {
-            cb.checked = false;
-        });
-
-        const roleContainer = page.querySelector("#FolderRoleMapping");
-        roleContainer.querySelectorAll(".oidc-role-mapping-container").forEach((e) => e.remove());
-
-        const userContainer = page.querySelector("#AutoLinkingAllowList");
-        userContainer.querySelectorAll(".user-checkbox").forEach((cb) => {
-            cb.checked = false;
-        });
-
-        oidcConfigurationPage.updateLibraryAccessVisibility(page);
-        oidcConfigurationPage.updateLiveTvVisibility(page);
-
-        ScopeManager.set([]);
-    },
-
-    populateEnabledFolders: (folder_list, container) => {
-        container.querySelectorAll(".folder-checkbox").forEach((e) => {
-            e.checked = folder_list.includes(e.getAttribute("data-id"));
-        });
-    },
-
-    serializeEnabledFolders: (container) => {
-        return [...container.querySelectorAll(".folder-checkbox")]
-            .filter((e) => e.checked)
-            .map((e) => e.getAttribute("data-id"));
-    },
-
-    populateFolders: (container) => {
-        return ApiClient.getJSON(ApiClient.getUrl("Library/MediaFolders", { IsHidden: false })).then((folders) => {
-            oidcConfigurationPage._populateFolders(container, folders);
-        });
-    },
-
-    _populateFolders: (container, folders) => {
-        container.querySelectorAll(".emby-checkbox-label").forEach((e) => e.remove());
-
-        const checkboxes = folders.Items.map((folder) => {
-            const out = document.createElement("label");
-            out.innerHTML = `
-                <input
-                    is="emby-checkbox"
-                    class="folder-checkbox chkFolder"
-                    data-id="${folder.Id}"
-                    type="checkbox"
-                />
-                <span>${folder.Name}</span>
-            `;
-            return out;
-        });
-
-        checkboxes.forEach((e) => {
-            container.appendChild(e);
-        });
-    },
-
-    populateRoleMappings: (folder_role_mappings, container) => {
-        container.querySelectorAll(".oidc-role-mapping-container").forEach((e) => e.remove());
-
-        const mapping_elements = folder_role_mappings.map((mapping) => {
-            const elem = document.createElement("div");
-            elem.classList.add("oidc-role-mapping-container");
-            elem.innerHTML = `
-                <label class="inputLabel inputLabelUnfocused oidc-role-mapping-input-label">Role:</label>
-                <div class="listItem">
-                    <input
-                        is="emby-input"
-                        required=""
-                        type="text"
-                        class="listItemBody oidc-role-mapping-name"
-                        placeholder="role_name"
-                    />
-                    <button
-                        type="button"
-                        is="paper-icon-button-light"
-                        class="listItemButton oidc-remove-role-mapping"
-                    >
-                        <span class="material-icons remove_circle" aria-hidden="true"></span>
-                    </button>
-                </div>
-                <div class="checkboxList paperList oidc-folder-list"></div>
-            `;
-
-            const checklist = elem.querySelector(".oidc-folder-list");
-            const enabled_folders = mapping["Folders"];
-
-            oidcConfigurationPage
-                .populateFolders(checklist)
-                .then(() => oidcConfigurationPage.populateEnabledFolders(enabled_folders, checklist));
-
-            elem.querySelector(".oidc-role-mapping-name").value = mapping["Role"];
-            elem.querySelector(".oidc-remove-role-mapping").addEventListener(
-                "click",
-                oidcConfigurationPage.handleRoleMappingRemove,
-            );
-
-            return elem;
-        });
-
-        mapping_elements.forEach((e) => container.appendChild(e));
-    },
-
-    serializeRoleMappings: (container) => {
-        const out = [];
-        [...container.querySelectorAll(".oidc-role-mapping-container")].forEach((elem) => {
-            const role = elem.querySelector(".oidc-role-mapping-name").value;
-            const checklist = elem.querySelector(".oidc-folder-list");
-            out.push({
-                Role: role,
-                Folders: oidcConfigurationPage.serializeEnabledFolders(checklist),
-            });
-        });
-        return out;
-    },
-
-    handleRoleMappingRemove: (evt) => {
-        const targeted_mapping = evt.target.closest(".oidc-role-mapping-container");
-        targeted_mapping.remove();
-    },
-
-    listArgumentsByType: (page) => {
-        const toggle_class = ".oidc-toggle";
-        const text_class = ".oidc-text";
-        const text_list_class = ".oidc-line-list";
-        const select_class = ".oidc-select";
-        const folder_list_fields = ["EnabledFolders"];
-        const role_map_fields = ["FolderRoleMapping"];
-
-        const oidc_form = page.querySelector("#oidc-new-oidc-provider");
-
-        const text_fields = [...oidc_form.querySelectorAll(text_class)].map((e) => e.id);
-        const text_list_fields = [...oidc_form.querySelectorAll(text_list_class)].map((e) => e.id);
-        const check_fields = [...oidc_form.querySelectorAll(toggle_class)].map((e) => e.id);
-        const select_fields = [...oidc_form.querySelectorAll(select_class)].map((e) => e.id);
-
-        return { text_fields, text_list_fields, check_fields, select_fields, folder_list_fields, role_map_fields };
-    },
-
-    fillTextList: (text_list, element) => {
-        element.value = text_list.join("\r\n");
-    },
-
-    parseTextList: (element) => {
-        return element.value
-            .split("\n")
-            .map((e) => e.trim())
-            .filter((e) => e);
-    },
-
-    updateLibraryAccessVisibility: (page) => {
-        const enableAllFolders = page.querySelector("#EnableAllFolders").checked;
-        const enableFolderRoles = page.querySelector("#EnableFolderRoles").checked;
-
-        const foldersContainer = page.querySelector("#Container-EnabledFolders");
-        const rolesToggleContainer = page.querySelector("#Container-EnableFolderRoles");
-        const roleMappingContainer = page.querySelector("#Container-FolderRoleMapping");
-
-        if (enableAllFolders) {
-            foldersContainer.style.display = "none";
-            rolesToggleContainer.style.display = "none";
-            roleMappingContainer.style.display = "none";
-        } else {
-            foldersContainer.style.display = "block";
-            rolesToggleContainer.style.display = "block";
-            roleMappingContainer.style.display = enableFolderRoles ? "block" : "none";
-        }
-    },
-
-    updateLiveTvVisibility: (page) => {
-        const enableLiveTv = page.querySelector("#EnableLiveTv").checked;
-        const enableLiveTvMgmt = page.querySelector("#EnableLiveTvManagement").checked;
-        const enableLiveTvRoles = page.querySelector("#EnableLiveTvRoles").checked;
-
-        const rbacToggleContainer = page.querySelector("#Container-EnableLiveTvRoles");
-        const liveTvRolesContainer = page.querySelector("#Container-LiveTvRoles");
-        const liveTvMgmtRolesContainer = page.querySelector("#Container-LiveTvManagementRoles");
-
-        if (enableLiveTv && enableLiveTvMgmt) {
-            rbacToggleContainer.style.display = "none";
-            liveTvRolesContainer.style.display = "none";
-            liveTvMgmtRolesContainer.style.display = "none";
-        } else {
-            rbacToggleContainer.style.display = "block";
-
-            if (enableLiveTvRoles) {
-                liveTvRolesContainer.style.display = enableLiveTv ? "none" : "block";
-                liveTvMgmtRolesContainer.style.display = enableLiveTvMgmt ? "none" : "block";
-            } else {
-                liveTvRolesContainer.style.display = "none";
-                liveTvMgmtRolesContainer.style.display = "none";
-            }
-        }
-    },
-
-    loadProvider: (page, provider_name) => {
-        ApiClient.getPluginConfiguration(oidcConfigurationPage.pluginUniqueId).then((config) => {
-            const provider = config.Configs[provider_name] || {};
-            const form_elements = oidcConfigurationPage.listArgumentsByType(page);
-
-            page.querySelector("#ProviderName").value = provider_name;
-
-            ScopeManager.set(provider.Scopes);
-
-            form_elements.text_fields.forEach((id) => {
-                if (provider[id]) page.querySelector("#" + id).value = provider[id];
-            });
-
-            form_elements.text_list_fields.forEach((id) => {
-                if (provider[id]) oidcConfigurationPage.fillTextList(provider[id], page.querySelector("#" + id));
-            });
-
-            form_elements.select_fields.forEach((id) => {
-                if (provider[id]) page.querySelector("#" + id).value = provider[id];
-            });
-
-            form_elements.folder_list_fields.forEach((id) => {
-                if (provider[id]) {
-                    oidcConfigurationPage.populateEnabledFolders(provider[id], page.querySelector(`#${id}`));
-                }
-            });
-
-            form_elements.check_fields.forEach((id) => {
-                if (provider[id] !== undefined) page.querySelector("#" + id).checked = provider[id];
-            });
-
-            form_elements.role_map_fields.forEach((id) => {
-                const elem = page.querySelector(`#${id}`);
-                if (provider[id]) oidcConfigurationPage.populateRoleMappings(provider[id], elem);
-            });
-
-            const userContainer = page.querySelector("#AutoLinkingAllowList");
-            userContainer.querySelectorAll(".user-checkbox").forEach((cb) => {
-                const username = cb.getAttribute("data-username");
-                cb.checked = provider.AutoLinkingAllowList && provider.AutoLinkingAllowList.includes(username);
-            });
-
-            oidcConfigurationPage.updateLiveTvVisibility(page);
-            oidcConfigurationPage.updateLibraryAccessVisibility(page);
-        });
-    },
-
-    deleteProvider: (page, provider_name) => {
-        if (!window.confirm(`Are you sure you want to delete "${provider_name}"? This cannot be undone.`)) {
+        if (result === null) {
+            Dashboard.alert(`Provider "${name}" no longer exists on the server.`);
             return;
         }
+        Dashboard.processPluginConfigurationUpdateResult(result);
+        Dashboard.alert(`Provider "${name}" removed.`);
+        loadConfiguration(view);
+        showDashboard(view);
+    } catch {
+        Dashboard.alert(`Failed to delete provider "${name}".`);
+    }
+}
 
-        ApiClient.getPluginConfiguration(oidcConfigurationPage.pluginUniqueId).then((config) => {
-            if (!config.Configs.hasOwnProperty(provider_name)) {
-                return;
-            }
+async function checkMigrationAvailable(view) {
+    const button = q(view, "#oidc-migrate-btn");
+    try {
+        const available = await ApiClient.getJSON(ApiClient.getUrl("OpenIDConnect/Providers/MigrationAvailable"));
+        button.style.display = available ? "" : "none";
+    } catch {
+        button.style.display = "none";
+    }
+}
 
-            delete config.Configs[provider_name];
+async function migrateProviders(view) {
+    if (
+        !window.confirm(
+            "This will migrate settings from 9p4's SSO plugin. Current providers will be overridden if they have the same name. Linked users and the avatar URL will not be migrated. Continue?",
+        )
+    )
+        return;
 
-            ApiClient.updatePluginConfiguration(oidcConfigurationPage.pluginUniqueId, config).then((result) => {
-                Dashboard.processPluginConfigurationUpdateResult(result);
-                oidcConfigurationPage.loadConfiguration(page);
-                oidcConfigurationPage.showDashboard(page);
-                Dashboard.alert(`Provider "${provider_name}" removed.`);
-            });
-        });
-    },
+    try {
+        await ApiClient.ajax({ type: "POST", url: ApiClient.getUrl("OpenIDConnect/Providers/Migrate") });
+        Dashboard.alert("Migration successful.");
+    } catch {
+        Dashboard.alert(
+            "Migration failed — check the server logs. Either no 9p4 configuration was found or the request was rejected.",
+        );
+    }
+    configPromise = null;
+    loadConfiguration(view);
+}
 
-    saveProvider: (page, provider_name) => {
-        if (!provider_name || !provider_name.trim()) {
-            Dashboard.alert("Please enter a provider name.");
-            return;
-        }
-
-        const safeNameRegex = /^[a-zA-Z0-9\-_]+$/;
-        if (!safeNameRegex.test(provider_name)) {
-            Dashboard.alert("Provider name must only contain letters, numbers, dashes, and underscores.");
-            return;
-        }
-
-        dirty = false;
-
-        const form_elements = oidcConfigurationPage.listArgumentsByType(page);
-
-        ApiClient.getPluginConfiguration(oidcConfigurationPage.pluginUniqueId).then((config) => {
-            let current_config = {};
-            if (config.Configs.hasOwnProperty(provider_name)) {
-                current_config = config.Configs[provider_name];
-            }
-
-            form_elements.text_fields.forEach((id) => {
-                const value = page.querySelector("#" + id).value;
-                current_config[id] = value || null;
-            });
-
-            form_elements.check_fields.forEach((id) => {
-                current_config[id] = page.querySelector("#" + id).checked;
-            });
-
-            form_elements.text_list_fields.forEach((id) => {
-                current_config[id] = oidcConfigurationPage.parseTextList(page.querySelector("#" + id));
-            });
-
-            form_elements.select_fields.forEach((id) => {
-                const value = page.querySelector("#" + id).value;
-                current_config[id] = value || null;
-            });
-
-            form_elements.folder_list_fields.forEach((id) => {
-                const elem = page.querySelector(`#${id}`);
-                current_config[id] = oidcConfigurationPage.serializeEnabledFolders(elem);
-            });
-
-            form_elements.role_map_fields.forEach((id) => {
-                const elem = page.querySelector(`#${id}`);
-                current_config[id] = oidcConfigurationPage.serializeRoleMappings(elem);
-            });
-
-            const userContainer = page.querySelector("#AutoLinkingAllowList");
-            current_config.AutoLinkingAllowList = [...userContainer.querySelectorAll(".user-checkbox")]
-                .filter((cb) => cb.checked)
-                .map((cb) => cb.getAttribute("data-username"));
-
-            current_config["Scopes"] = ScopeManager.get();
-
-            if (current_config["Endpoint"] === null || current_config["Endpoint"].trim() === "") {
-                Dashboard.alert("Endpoint cannot be empty.");
-                return;
-            }
-
-            if (current_config["ClientId"] === null || current_config["ClientId"].trim() === "") {
-                Dashboard.alert("Client ID cannot be empty.");
-                return;
-            }
-
-            if (current_config["Secret"] === null || current_config["Secret"].trim() === "") {
-                Dashboard.alert("Secret cannot be empty.");
-                return;
-            }
-
-            config.Configs[provider_name] = current_config;
-
-            ApiClient.updatePluginConfiguration(oidcConfigurationPage.pluginUniqueId, config).then((result) => {
-                Dashboard.processPluginConfigurationUpdateResult(result);
-                oidcConfigurationPage.loadConfiguration(page);
-                oidcConfigurationPage.showDashboard(page);
-            });
-        });
-    },
-
-    addTextAreaStyle: (view) => {
-        const style = document.createElement("link");
-        style.rel = "stylesheet";
-        style.href = ApiClient.getUrl("web/configurationpage") + "?name=openid-connect.css";
-        view.appendChild(style);
-    },
-
-    populateUsers: (container) => {
-        return ApiClient.getUsers().then((users) => {
-            container.innerHTML = "";
-            users.forEach((user) => {
-                const label = document.createElement("label");
-                label.innerHTML = `
-                <input is="emby-checkbox" class="user-checkbox" data-username="${user.Name}" type="checkbox" />
-                <span>${user.Name}</span>
-            `;
-                container.appendChild(label);
-            });
-        });
-    },
-
-    populateAuthProviders: (selectElement) => {
-        return ApiClient.ajax({
-            type: "GET",
-            url: ApiClient.getUrl("/OpenIDConnect/AuthProviders"),
-            dataType: "json",
-        }).then((providers) => {
-            selectElement.innerHTML = "";
-
-            providers.forEach((provider) => {
-                const option = document.createElement("option");
-                option.value = provider.Type;
-                option.textContent = provider.Name;
-                selectElement.appendChild(option);
-            });
-        });
-    },
-
-    updateAvatarSecurityVisibility: (page) => {
-        const disableSsrf = page.querySelector("#GlobalDisableAvatarSsrfCheck").checked;
-        const privateIpContainer = page.querySelector("#Container-GlobalAllowPrivateAvatarIp");
-
-        privateIpContainer.style.display = disableSsrf ? "none" : "block";
-    },
-};
+// ============ 7. Page controller ============
 
 export default function (view) {
-    oidcConfigurationPage.addTextAreaStyle(view);
-    oidcConfigurationPage.loadConfiguration(view);
-    oidcConfigurationPage.showDashboard(view);
+    // Reset module state for this activation.
+    dirty = false;
+    configPromise = null;
+    foldersPromise = null;
+    writeQueue = Promise.resolve();
 
-    view.querySelector("#oidc-migrate-btn").addEventListener("click", () => {
-        if (
-            !window.confirm(
-                "This will migrate settings from 9p4's SSO plugin. Current providers will be overriden if they have the same name. Linked users and the avatar URL will not be migrated. Continue?",
-            )
-        ) {
-            return;
+    addStylesheet(view);
+    ScopeManager.init(view);
+    wireVisibility(view);
+    loadConfiguration(view);
+    showDashboard(view);
+
+    // Provider list — event delegation survives re-renders.
+    q(view, "#oidc-provider-list").addEventListener("click", (e) => {
+        const item = e.target.closest(".oidc-provider-list-item");
+        if (!item) return;
+        if (e.target.closest(".oidc-provider-list-delete")) {
+            deleteProvider(view, item.dataset.provider);
+        } else {
+            openEditor(view, item.dataset.provider);
         }
-
-        ApiClient.ajax({
-            type: "POST",
-            url: ApiClient.getUrl("OpenIDConnect/Providers/Migrate"),
-        })
-            .then((response) => {
-                Dashboard.alert("Migration successful.");
-                oidcConfigurationPage.loadConfiguration(view);
-            })
-            .catch((error) => {
-                Dashboard.alert("Migration failed or old configuration not found.");
-            });
     });
 
-    view.querySelector("#oidc-new-oidc-provider").addEventListener("input", () => {
-        dirty = true;
-    });
+    q(view, "#oidc-add-provider").addEventListener("click", () => openEditor(view, null));
+    q(view, "#oidc-back-to-dashboard").addEventListener("click", () => showDashboard(view));
+    q(view, "#oidc-migrate-btn").addEventListener("click", () => migrateProviders(view));
 
-    view.querySelector("#oidc-new-oidc-provider").addEventListener("change", () => {
-        dirty = true;
-    });
-
-    view.querySelector("#oidc-add-provider").addEventListener("click", () => {
-        oidcConfigurationPage.openEditor(view, null);
-    });
-
-    view.querySelector("#oidc-back-to-dashboard").addEventListener("click", () => {
-        oidcConfigurationPage.showDashboard(view);
-    });
-
-    view.querySelector("#TestProvider").addEventListener("click", (e) => {
+    const form = q(view, "#oidc-provider-form");
+    form.addEventListener("submit", (e) => {
         e.preventDefault();
-        const provider_name = view.querySelector("#ProviderName").value.trim();
+        saveProvider(view);
+    });
+    form.addEventListener("input", () => {
+        dirty = true;
+    });
+    form.addEventListener("change", () => {
+        dirty = true;
+    });
 
-        if (!provider_name) return;
+    q(view, "#TestProvider").addEventListener("click", async (e) => {
+        e.preventDefault();
+        if (!form.reportValidity()) return;
 
         if (dirty) {
-            const confirmSave = window.confirm(
-                "You have unsaved changes. The test will run against the last saved version on the server. Do you want to save your changes now?",
+            const saveNow = window.confirm(
+                "You have unsaved changes. The test runs against the version saved on the server. Save your changes now and start the test?",
             );
-            if (confirmSave) {
-                view.querySelector("#SaveProvider").click();
-                Dashboard.alert("Configuration saved. Please click 'Test Connection' again.");
-            }
-
-            return;
+            if (!saveNow) return;
+            if (!(await saveProvider(view))) return;
         }
 
-        const testUrl = ApiClient.getUrl(`OpenIDConnect/start/${provider_name}?isTesting=true`);
-        window.open(testUrl, "_blank");
+        const name = q(view, "#ProviderName").value.trim();
+        window.open(ApiClient.getUrl(`OpenIDConnect/start/${encodeURIComponent(name)}`, { isTesting: true }), "_blank");
     });
 
-    view.querySelector("#SaveProvider").addEventListener("click", (e) => {
-        const provider_name = view.querySelector("#ProviderName").value.trim();
-        oidcConfigurationPage.saveProvider(view, provider_name);
+    q(view, "#DeleteProvider").addEventListener("click", (e) => {
         e.preventDefault();
-        return false;
+        const name = q(view, "#ProviderName").value.trim();
+        if (name) deleteProvider(view, name);
     });
 
-    view.querySelector("#DeleteProvider").addEventListener("click", (e) => {
-        const provider_name = view.querySelector("#ProviderName").value.trim();
-        if (provider_name) {
-            oidcConfigurationPage.deleteProvider(view, provider_name);
-        }
-        e.preventDefault();
-        return false;
+    q(view, "#AddRoleMapping").addEventListener("click", async () => {
+        const container = q(view, `#${ROLE_MAP_FIELD}`);
+        const mappings = serializeRoleMappings(container);
+        mappings.push({ Role: "", Folders: [] });
+        renderRoleMappings(view, container, mappings, await getFolders());
+        dirty = true;
     });
 
-    view.querySelector("#AddRoleMapping").addEventListener("click", (e) => {
-        const container = view.querySelector("#FolderRoleMapping");
-        const current_mappings = oidcConfigurationPage.serializeRoleMappings(container);
-        current_mappings.push({ Role: "", Folders: [] });
-        oidcConfigurationPage.populateRoleMappings(current_mappings, container);
+    // Remove role mapping — one delegated listener for all rows.
+    q(view, `#${ROLE_MAP_FIELD}`).addEventListener("click", (e) => {
+        const button = e.target.closest(".oidc-remove-role-mapping");
+        if (!button) return;
+        button.closest(".oidc-role-mapping-container")?.remove();
+        dirty = true;
     });
 
-    const selfServiceLink = view.querySelector("#oidc-self-service-link");
-    selfServiceLink.href = "/OpenIDConnectViews/link";
-    selfServiceLink.addEventListener("click", (e) => {
-        window.location.href = "/OpenIDConnectViews/link";
+    // Anchor navigates natively; point it at the API server so it also works
+    // when the web UI is hosted on a different origin than the server.
+    q(view, "#oidc-self-service-link").href = ApiClient.getUrl("OpenIDConnectViews/link");
+
+    q(view, "#ToggleSecret").addEventListener("click", () => {
+        const input = q(view, "#Secret");
+        const icon = q(view, "#ToggleSecret .material-icons");
+        const show = input.type === "password";
+        input.type = show ? "text" : "password";
+        icon.textContent = show ? "visibility_off" : "visibility";
     });
 
-    view.querySelector("#ToggleSecret").addEventListener("click", () => {
-        const secretInput = view.querySelector("#Secret");
-        const icon = view.querySelector("#ToggleSecret .material-icons");
-
-        if (secretInput.type === "password") {
-            secretInput.type = "text";
-            icon.textContent = "visibility_off";
-        } else {
-            secretInput.type = "password";
-            icon.textContent = "visibility";
-        }
-    });
-
-    view.querySelector("#EnableAllFolders").addEventListener("change", () => {
-        oidcConfigurationPage.updateLibraryAccessVisibility(view);
-    });
-
-    view.querySelector("#EnableFolderRoles").addEventListener("change", () => {
-        oidcConfigurationPage.updateLibraryAccessVisibility(view);
-    });
-
-    view.querySelector("#EnableLiveTvRoles").addEventListener("change", () => {
-        oidcConfigurationPage.updateLiveTvVisibility(view);
-    });
-
-    view.querySelector("#EnableLiveTv").addEventListener("change", () => {
-        oidcConfigurationPage.updateLiveTvVisibility(view);
-    });
-
-    view.querySelector("#EnableLiveTvManagement").addEventListener("change", () => {
-        oidcConfigurationPage.updateLiveTvVisibility(view);
-    });
-
-    view.querySelector("#GlobalAllowPrivateAvatarIp").addEventListener("change", () => {
-        oidcConfigurationPage.saveGlobalSettings(view);
-    });
-
-    view.querySelector("#GlobalDisableAvatarSsrfCheck").addEventListener("change", () => {
-        oidcConfigurationPage.updateAvatarSecurityVisibility(view);
-        oidcConfigurationPage.saveGlobalSettings(view);
-    });
-
-    ScopeManager.init(view);
+    q(view, "#GlobalAllowPrivateAvatarIp").addEventListener("change", () => saveGlobalSettings(view));
+    q(view, "#GlobalDisableAvatarSsrfCheck").addEventListener("change", () => saveGlobalSettings(view));
 }

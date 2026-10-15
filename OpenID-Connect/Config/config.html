@@ -13,6 +13,9 @@
 >
     <div data-role="content">
         <div class="content-primary">
+
+            <!-- ===================== Page header ===================== -->
+
             <div class="sectionTitleContainer flex align-items-center">
                 <h2 class="sectionTitle">
                     <span class="material-icons" style="vertical-align: middle; margin-right: 0.25em;">vpn_key</span>
@@ -57,13 +60,66 @@
                 to accomplish this.
             </div>
 
+            <!-- ===================== Templates ===================== -->
+            <!-- Inert markup cloned by config.js. Every dynamic value is set via
+                 textContent / dataset by the controller — no HTML strings in JS. -->
+
+            <template id="tpl-provider-item">
+                <div class="oidc-provider-list-item">
+                    <span class="oidc-provider-list-icon material-icons"></span>
+                    <span class="oidc-provider-list-name"></span>
+                    <span class="oidc-provider-list-endpoint"></span>
+                    <span class="oidc-provider-list-status"></span>
+                    <button class="oidc-provider-list-delete" type="button">
+                        <span class="material-icons" style="font-size: 1.1em;">close</span>
+                    </button>
+                </div>
+            </template>
+
+            <template id="tpl-check-item">
+                <label>
+                    <input is="emby-checkbox" type="checkbox"/>
+                    <span></span>
+                </label>
+            </template>
+
+            <template id="tpl-role-mapping">
+                <div class="oidc-role-mapping-container">
+                    <label class="inputLabel inputLabelUnfocused oidc-role-mapping-input-label">Role:</label>
+                    <div class="listItem">
+                        <input
+                            class="listItemBody oidc-role-mapping-name"
+                            is="emby-input"
+                            placeholder="role_name"
+                            type="text"
+                        />
+                        <button
+                            class="listItemButton oidc-remove-role-mapping"
+                            is="paper-icon-button-light"
+                            type="button"
+                        >
+                            <span aria-hidden="true" class="material-icons remove_circle"></span>
+                        </button>
+                    </div>
+                    <div class="checkboxList paperList oidc-folder-list"></div>
+                </div>
+            </template>
+
+            <!-- ===================== Dashboard view ===================== -->
+
             <div id="oidc-dashboard-view">
                 <div class="oidc-dashboard-header">
                     <h3 class="sectionTitle" style="margin: 0;">Configured Providers</h3>
                 </div>
 
                 <div class="oidc-provider-list" id="oidc-provider-list">
-                    <!-- Provider cards rendered by JS -->
+                    <!-- Provider cards cloned from #tpl-provider-item -->
+                </div>
+
+                <div class="oidc-empty-state" id="oidc-empty-state" style="display: none;">
+                    <div class="material-icons">vpn_key</div>
+                    <p><strong>No providers configured yet.</strong></p>
+                    <p>Click "Add Provider" below to get started.</p>
                 </div>
 
                 <button
@@ -104,9 +160,11 @@
                                 </div>
                             </div>
 
+                            <!-- Shown only while the SSRF check is enabled -->
                             <div class="checkboxContainer checkboxContainer-withDescription"
+                                 data-hide-if="GlobalDisableAvatarSsrfCheck"
                                  id="Container-GlobalAllowPrivateAvatarIp"
-                                 style="display: none; margin-top: 1.5em; margin-bottom: 0;">
+                                 style="margin-top: 1.5em; margin-bottom: 0;">
                                 <label>
                                     <input class="emby-checkbox" id="GlobalAllowPrivateAvatarIp" is="emby-checkbox"
                                            type="checkbox"/>
@@ -121,6 +179,8 @@
                     </div>
                 </form>
             </div>
+
+            <!-- ===================== Editor view ===================== -->
 
             <div id="oidc-editor-view" style="display: none;">
                 <button
@@ -138,17 +198,19 @@
                     <span id="oidc-editor-provider-name-display"></span>
                 </h3>
 
-                <form class="esqConfigurationForm" id="oidc-new-oidc-provider">
+                <form autocomplete="off" class="esqConfigurationForm" id="oidc-provider-form">
+
                     <div class="verticalSection">
                         <h3 class="sectionTitle">Basic Settings</h3>
                         <div class="collapseContent">
                             <div class="inputContainer">
                                 <label class="inputLabel inputLabelUnfocused" for="ProviderName">Provider
                                     Name (Required)</label>
-                                <input class="oidc-text" id="ProviderName" is="emby-input" required="" type="text"/>
+                                <input id="ProviderName" is="emby-input" pattern="[A-Za-z0-9_\-]+" required=""
+                                       title="Letters, numbers, dashes and underscores only" type="text"/>
                                 <div class="fieldDescription">
                                     Provider identifier (must be unique), used to identify this provider in API calls
-                                    and links.
+                                    and links. Letters, numbers, dashes and underscores only.
                                 </div>
                             </div>
 
@@ -207,7 +269,6 @@
                             <div class="inputContainer">
                                 <label class="inputLabel inputLabelUnfocused" for="RoleClaim">Role Claim</label>
                                 <input class="oidc-text" id="RoleClaim" is="emby-input" placeholder="groups"
-                                       required=""
                                        type="text"/>
                                 <div class="fieldDescription">
                                     The JSON path in the OIDC response to check for roles.
@@ -341,7 +402,9 @@
                                 </div>
                             </div>
 
-                            <div class="inputContainer" id="Container-EnabledFolders">
+                            <!-- Shown only when not all folders are enabled -->
+                            <div class="inputContainer" data-hide-if="EnableAllFolders"
+                                 id="Container-EnabledFolders">
                                 <label class="inputLabel inputLabelUnfocused" for="EnabledFolders">Enabled
                                     Libraries</label>
                                 <div
@@ -350,7 +413,9 @@
                                 </div>
                             </div>
 
+                            <!-- Shown only when not all folders are enabled -->
                             <div class="checkboxContainer checkboxContainer-withDescription"
+                                 data-hide-if="EnableAllFolders"
                                  id="Container-EnableFolderRoles">
                                 <label>
                                     <input class="oidc-toggle" id="EnableFolderRoles" is="emby-checkbox"
@@ -363,7 +428,10 @@
                                 </div>
                             </div>
 
-                            <div class="inputContainer" id="Container-FolderRoleMapping">
+                            <!-- Shown only when not all folders are enabled AND role-based access is on -->
+                            <div class="inputContainer" data-hide-if="EnableAllFolders"
+                                 data-hide-unless="EnableFolderRoles"
+                                 id="Container-FolderRoleMapping">
                                 <label class="inputLabel inputLabelUnfocused" for="FolderRoleMapping">
                                     Role &rarr; Library Mappings
                                     <button class="fab btnAddFolder submit" id="AddRoleMapping" is="emby-button"
@@ -402,7 +470,9 @@
                                 </div>
                             </div>
 
+                            <!-- Hidden when both direct grants are on (RBAC becomes irrelevant) -->
                             <div class="checkboxContainer checkboxContainer-withDescription"
+                                 data-hide-if="EnableLiveTv EnableLiveTvManagement"
                                  id="Container-EnableLiveTvRoles">
                                 <label>
                                     <input class="oidc-toggle" id="EnableLiveTvRoles" is="emby-checkbox"
@@ -416,7 +486,10 @@
                                 </div>
                             </div>
 
-                            <div class="inputContainer" id="Container-LiveTvRoles">
+                            <!-- Shown only when Live TV RBAC is on and the direct grant is off -->
+                            <div class="inputContainer" data-hide-if="EnableLiveTv"
+                                 data-hide-unless="EnableLiveTvRoles"
+                                 id="Container-LiveTvRoles">
                                 <label class="inputLabel inputLabelUnfocused" for="LiveTvRoles">Live TV Viewing
                                     Roles</label>
                                 <textarea class="oidc-line-list emby-textarea" id="LiveTvRoles" is="emby-textarea"
@@ -426,7 +499,10 @@
                                 </div>
                             </div>
 
-                            <div class="inputContainer" id="Container-LiveTvManagementRoles">
+                            <!-- Shown only when Live TV RBAC is on and the direct grant is off -->
+                            <div class="inputContainer" data-hide-if="EnableLiveTvManagement"
+                                 data-hide-unless="EnableLiveTvRoles"
+                                 id="Container-LiveTvManagementRoles">
                                 <label class="inputLabel inputLabelUnfocused" for="LiveTvManagementRoles">Live TV
                                     Management Roles</label>
                                 <textarea class="oidc-line-list emby-textarea" id="LiveTvManagementRoles"
@@ -465,7 +541,7 @@
                                 <label class="inputLabel inputLabelUnfocused" for="DefaultAuthProvider">Default
                                     Authentication Provider</label>
                                 <select class="oidc-select" id="DefaultAuthProvider" is="emby-select">
-                                    <!-- Options populated dynamically by JS -->
+                                    <!-- Options populated dynamically by config.js -->
                                 </select>
                                 <div class="fieldDescription">
                                     <strong>Warning: Users created by OIDC do not have a password!</strong> If using
@@ -550,7 +626,7 @@
 
                     <div class="oidc-action-bar">
                         <button class="raised button-submit emby-button" id="SaveProvider" is="emby-button"
-                                type="button">
+                                type="submit">
                             <span class="material-icons" style="vertical-align: middle; font-size: 1.2em;">save</span>
                             Save Provider
                         </button>
