@@ -29,7 +29,7 @@ jobs:
         id: ver
         run: |
           base=$(yq '.version' build.yaml | tr -d '"')
-          echo "version=${base}.$(date -u +%y%m).${GITHUB_RUN_NUMBER}.0" >> "$GITHUB_OUTPUT"
+          echo "version=${base}.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
 
       - name: Build plugin
         id: jprm
