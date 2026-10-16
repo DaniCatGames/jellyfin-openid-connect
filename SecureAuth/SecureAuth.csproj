@@ -21,6 +21,7 @@
         <PackageReference Include="Jellyfin.Controller" Version="12.2.0"/>
         <PackageReference Include="Jellyfin.Model" Version="12.2.0"/>
         <PackageReference Include="Microsoft.Security.AntiSSRF" Version="1.0.1"/>
+        <PackageReference Include="QRCoder" Version="1.8.1"/>
     </ItemGroup>
 
     <ItemGroup>
