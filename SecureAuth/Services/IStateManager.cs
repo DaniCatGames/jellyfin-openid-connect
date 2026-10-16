@@ -77,9 +77,9 @@ public abstract class TimedFlowState(DateTime created)
 public class TimedQrState(DateTime created) : TimedFlowState(created)
 {
     /// <summary>
-    ///     The user id of the user that scanned the QR code.
+    ///     The id of the device that scanned the QR code.
     /// </summary>
-    public string UserId { get; set; }
+    public string DeviceId { get; set; }
 
     /// <summary>
     ///     The name of the device that scanned the QR code.
@@ -95,7 +95,27 @@ public class TimedQrState(DateTime created) : TimedFlowState(created)
     ///     The version of the app that scanned the QR code.
     /// </summary>
     public string AppVersion { get; set; }
+
+    /// <summary>
+    ///     6 digit code shown to both devices.
+    /// </summary>
+    public string Fingerprint { get; set; }
+
+    /// <summary>
+    ///     What the current state of the QR flow is.
+    /// </summary>
+    public QrCodeState State { get; set; } = QrCodeState.Pending;
 }
+
+#pragma warning disable CS1591 // Missing XML comment for publicly visible type or member
+public enum QrCodeState
+{
+    Pending,
+    Approved,
+    Denied,
+    Expired,
+}
+#pragma warning restore CS1591 // Missing XML comment for publicly visible type or member
 
 /// <summary>
 ///     A manager for OpenID to manage the state of the clients.
