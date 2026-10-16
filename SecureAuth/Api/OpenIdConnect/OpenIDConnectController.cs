@@ -11,6 +11,7 @@ using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Duende.IdentityModel.OidcClient;
 using Jellyfin.Database.Implementations.Entities;
+using Jellyfin.Plugin.SecureAuth.Extensions;
 using Jellyfin.Plugin.SecureAuth.Services;
 using MediaBrowser.Common.Api;
 using MediaBrowser.Controller.Authentication;
@@ -177,7 +178,7 @@ public class OpenIdConnectController(
 
         return Content(Pages.RenderFlowPage(state,
                 provider,
-                GetRequestBase(config.UseHTTP, config.PortOverride),
+                Request.GetRequestBase(config.UseHTTP, config.PortOverride),
                 timedState.IsLinking),
             MediaTypeNames.Text.Html);
     }
@@ -190,7 +191,7 @@ public class OpenIdConnectController(
             Authority = config.Endpoint,
             ClientId = config.ClientId,
             ClientSecret = config.Secret,
-            RedirectUri = GetRequestBase(config.UseHTTP, config.PortOverride)
+            RedirectUri = Request.GetRequestBase(config.UseHTTP, config.PortOverride)
                           + $"/SecureAuth/OIDC/redirect/{provider}",
             Scope = string.Join(" ", scopes.Prepend("openid profile")),
             DisablePushedAuthorization = config.DisablePushedAuthorization,
@@ -425,24 +426,6 @@ public class OpenIdConnectController(
         logger.LogInformation("User {Username} unregistered from {Provider}", username, provider);
 
         return Ok();
-    }
-
-    private string GetRequestBase(bool useHttp = false, int? portOverride = null)
-    {
-        int requestPort = portOverride ?? Request.Host.Port ?? -1;
-
-        if ((requestPort, Request.Scheme) is (80, "http") or (443, "https"))
-        {
-            requestPort = -1;
-        }
-
-        return new UriBuilder
-        {
-            Scheme = useHttp ? "http" : "https",
-            Host = Request.Host.Host,
-            Port = requestPort,
-            Path = Request.PathBase,
-        }.ToString().TrimEnd('/');
     }
 }
 
