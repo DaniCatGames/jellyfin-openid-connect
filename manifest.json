@@ -1,7 +1,7 @@
 [
     {
         "guid": "3b621017-67a3-461e-a820-21622c591827",
-        "name": "OpenID Connect",
+        "name": "SecureAuth",
         "description": "This plugin allows users to sign in through an OIDC provider (such as Google, Facebook, or your own provider). This enables one-click signin.\nReview documentation at https://github.com/DaniCatGames/jellyfin-openid-connect\n",
         "overview": "Authenticate users against an OIDC provider.",
         "owner": "DaniCatGames",
@@ -783,6 +783,14 @@
                 "sourceUrl": "https://github.com/DaniCatGames/jellyfin-openid-connect/releases/download/unstable/openid-connect_1.2607.3.0.zip",
                 "checksum": "a0eb9f45e5ce8988cfcf61eca4dfeffa",
                 "timestamp": "2026-07-12T09:49:52Z"
+            },
+            {
+                "version": "1.1.0.105",
+                "changelog": "",
+                "targetAbi": "12.0.0",
+                "sourceUrl": "https://github.com/DaniCatGames/jellyfin-openid-connect/releases/download/unstable/secureauth_1.1.0.105.zip",
+                "checksum": "cd69f8454fe85eb87a83a9490a755d2f",
+                "timestamp": "2026-10-16T15:02:09Z"
             },
             {
                 "version": "1.0.1.104",
