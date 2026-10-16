@@ -32,7 +32,7 @@ namespace Jellyfin.Plugin.SecureAuth.Api.OpenIdConnect;
 /// <param name="loggerFactory">Instance of the <see cref="ILoggerFactory" /> interface.</param>
 /// <param name="userManager">Instance of the <see cref="IUserManager" /> interface.</param>
 /// <param name="httpClientFactory">Instance of the <see cref="IHttpClientFactory" /> interface.</param>
-/// <param name="stateManager">Instance of the <see cref="IStateManager" /> interface.</param>
+/// <param name="stateManager">Instance of the <see cref="IStateManager{TimedOidcState}" /> interface.</param>
 /// <param name="oidcUserManager">Instance of the <see cref="IOidcUserManager" /> interface.</param>
 /// <param name="eventManager">Instance of the <see cref="IEventManager" /> interface.</param>
 [ApiController]
@@ -43,7 +43,7 @@ public class OpenIdConnectController(
     ILoggerFactory loggerFactory,
     IUserManager userManager,
     IHttpClientFactory httpClientFactory,
-    IStateManager stateManager,
+    IStateManager<TimedOidcState> stateManager,
     IOidcUserManager oidcUserManager,
     IEventManager eventManager
 ) : ControllerBase
@@ -73,7 +73,7 @@ public class OpenIdConnectController(
             return BadRequest("Missing state");
         }
 
-        if (!stateManager.TryGetValue(state, out TimedAuthorizeState timedState)
+        if (!stateManager.TryGetValue(state, out TimedOidcState timedState)
             || timedState.IsExpired() || timedState.Provider != provider)
         {
             return BadRequest("Invalid or expired state");
@@ -226,7 +226,7 @@ public class OpenIdConnectController(
         string[] segments,
         IEnumerable<Claim> claims,
         Config config,
-        TimedAuthorizeState timedState)
+        TimedOidcState timedState)
     {
         List<string> roles = [];
         foreach (Claim claim in claims)
@@ -317,7 +317,7 @@ public class OpenIdConnectController(
             return BadRequest($"Error preparing login: {state.Error} - {state.ErrorDescription}");
         }
 
-        var timedState = new TimedAuthorizeState(state, DateTime.UtcNow)
+        var timedState = new TimedOidcState(state, DateTime.UtcNow)
         {
             IsLinking = isLinking,
             IsTesting = isTesting,
@@ -360,7 +360,7 @@ public class OpenIdConnectController(
             return BadRequest("Provider does not exist");
         }
 
-        if (!stateManager.TryGetValue(response.Data, out TimedAuthorizeState timedState))
+        if (!stateManager.TryGetValue(response.Data, out TimedOidcState timedState))
         {
             return Problem("State not found");
         }

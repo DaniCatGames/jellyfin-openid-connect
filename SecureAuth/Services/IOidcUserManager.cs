@@ -18,7 +18,7 @@ public interface IOidcUserManager
     /// <param name="timedState">TimedState belonging to the flow</param>
     /// <param name="config">The server config.</param>
     /// <returns></returns>
-    Task<Guid> GetOrCreateUser(string provider, TimedAuthorizeState timedState, Config config);
+    Task<Guid> GetOrCreateUser(string provider, TimedOidcState timedState, Config config);
 
     /// <summary>
     ///     Authenticates the user with the given information.
@@ -32,7 +32,7 @@ public interface IOidcUserManager
         Guid userId,
         AuthResponse authResponse,
         Config config,
-        TimedAuthorizeState timedState,
+        TimedOidcState timedState,
         string ipAddress);
 
 

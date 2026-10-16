@@ -17,7 +17,7 @@ public class PluginServiceRegistrator : IPluginServiceRegistrator
     /// <inheritdoc />
     public void RegisterServices(IServiceCollection serviceCollection, IServerApplicationHost applicationHost)
     {
-        serviceCollection.AddSingleton<IStateManager, StateManager>();
+        serviceCollection.AddSingleton(typeof(IStateManager<>), typeof(StateManager<>));
         serviceCollection.AddSingleton<ILinkManager, LinkManager>();
         serviceCollection.AddSingleton<IOidcUserManager, OidcUserManager>();
         serviceCollection.AddSingleton<IEventConsumer<UserDeletedEventArgs>, UserDeletedHandler>();

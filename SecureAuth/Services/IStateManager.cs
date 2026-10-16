@@ -8,37 +8,33 @@ namespace Jellyfin.Plugin.SecureAuth.Services;
 /// <summary>
 ///     Interface for the state manager.
 /// </summary>
-public interface IStateManager
+public interface IStateManager<TState> where TState : TimedFlowState
 {
     /// <summary>
     ///     Try to get a state by key.
     /// </summary>
     /// <param name="key">The id of the state to get</param>
     /// <param name="state">The state</param>
-    /// <returns></returns>
-    bool TryGetValue(string key, out TimedAuthorizeState state);
+    bool TryGetValue(string key, out TState state);
 
     /// <summary>
     ///     Try to add a state to the manager
     /// </summary>
     /// <param name="key">The id of the state to add</param>
     /// <param name="state">The state to add</param>
-    /// <returns></returns>
-    bool TryAdd(string key, TimedAuthorizeState state);
+    bool TryAdd(string key, TState state);
 
     /// <summary>
     ///     Try to remove a state from the manager
     /// </summary>
     /// <param name="key">The id of the state to remove</param>
     /// <param name="state">The state that was removed.</param>
-    /// <returns></returns>
-    bool TryRemove(string key, out TimedAuthorizeState state);
+    bool TryRemove(string key, out TState state);
 
     /// <summary>
     ///     Get all currently running states and states that haven't been removed by Invalidate() yet.
     /// </summary>
-    /// <returns>the states</returns>
-    ConcurrentDictionary<string, TimedAuthorizeState> GetStates();
+    ConcurrentDictionary<string, TState> GetStates();
 
     /// <summary>
     ///     Remove all states too old.
@@ -47,19 +43,69 @@ public interface IStateManager
 }
 
 /// <summary>
+///     A state connected to an active flow
+/// </summary>
+/// <param name="created">When the flow started</param>
+public abstract class TimedFlowState(DateTime created)
+{
+    /// <summary>
+    ///     When the flow was initiated
+    /// </summary>
+    private DateTime Created { get; } = created;
+
+    /// <summary>
+    ///     Check if the flow is expired.
+    /// </summary>
+    /// <param name="lifetime">How long the flow should be valid for</param>
+    public bool IsExpired(TimeSpan? lifetime = null)
+    {
+        return Created < DateTime.UtcNow - (lifetime ?? TimeSpan.FromMinutes(5));
+    }
+
+    /// <summary>
+    ///     Check if the flow is still valid.
+    /// </summary>
+    public virtual bool IsValid()
+    {
+        return !IsExpired();
+    }
+}
+
+/// <summary>
+///     The state of a QR code flow.
+/// </summary>
+public class TimedQrState(DateTime created) : TimedFlowState(created)
+{
+    /// <summary>
+    ///     The user id of the user that scanned the QR code.
+    /// </summary>
+    public string UserId { get; set; }
+
+    /// <summary>
+    ///     The name of the device that scanned the QR code.
+    /// </summary>
+    public string DeviceName { get; set; }
+
+    /// <summary>
+    ///     The name of the app that scanned the QR code.
+    /// </summary>
+    public string AppName { get; set; }
+
+    /// <summary>
+    ///     The version of the app that scanned the QR code.
+    /// </summary>
+    public string AppVersion { get; set; }
+}
+
+/// <summary>
 ///     A manager for OpenID to manage the state of the clients.
 /// </summary>
-public class TimedAuthorizeState(AuthorizeState state, DateTime created)
+public class TimedOidcState(AuthorizeState state, DateTime created) : TimedFlowState(created)
 {
     /// <summary>
     ///     Gets or sets the Authorization State of the client.
     /// </summary>
     public AuthorizeState State { get; } = state;
-
-    /// <summary>
-    ///     Gets or sets when this object was created to time it out.
-    /// </summary>
-    private DateTime Created { get; } = created;
 
     /// <summary>
     ///     Gets or sets a value indicating whether the user is valid.
@@ -134,13 +180,5 @@ public class TimedAuthorizeState(AuthorizeState state, DateTime created)
     public bool IsValid(string provider, string flowCookie)
     {
         return Valid && !IsExpired() && Provider == provider && Cookie == flowCookie;
-    }
-
-    /// <summary>
-    ///     Check if a state is expired.
-    /// </summary>
-    public bool IsExpired()
-    {
-        return Created < DateTime.UtcNow.AddMinutes(-5);
     }
 }

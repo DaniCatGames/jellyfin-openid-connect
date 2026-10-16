@@ -33,7 +33,7 @@ public class OidcUserManager(
     private readonly HttpClient _client = CreateClient();
 
     /// <inheritdoc />
-    public async Task<Guid> GetOrCreateUser(string provider, TimedAuthorizeState timedState, Config config)
+    public async Task<Guid> GetOrCreateUser(string provider, TimedOidcState timedState, Config config)
     {
         // if there is a link to the user, return linked id
         if (linkManager.TryGetLink(provider, timedState.Sub, out Guid userId))
@@ -156,7 +156,7 @@ public class OidcUserManager(
         Guid userId,
         AuthResponse authResponse,
         Config config,
-        TimedAuthorizeState timedState,
+        TimedOidcState timedState,
         string ipAddress)
     {
         User user = userManager.GetUserById(userId);
@@ -205,7 +205,7 @@ public class OidcUserManager(
 
     private async Task UpdateUser(
         Config config,
-        TimedAuthorizeState timedState,
+        TimedOidcState timedState,
         User user)
     {
         user.SetPermission(PermissionKind.IsAdministrator, timedState.Admin);

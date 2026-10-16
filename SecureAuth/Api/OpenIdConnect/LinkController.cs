@@ -16,7 +16,7 @@ namespace Jellyfin.Plugin.SecureAuth.Api.OpenIdConnect;
 /// </summary>
 /// <param name="authContext">Instance of the <see cref="IAuthorizationContext" /> interface.</param>
 /// <param name="linkManager">Instance of the <see cref="ILinkManager" /> interface.</param>
-/// <param name="stateManager">Instance of the <see cref="IStateManager" /> interface.</param>
+/// <param name="stateManager">Instance of the <see cref="IStateManager{TimedOidcState}" /> interface.</param>
 /// <param name="logger">Instance of the <see cref="ILogger" /> interface.</param>
 [ApiController]
 [Route("SecureAuth/OIDC")]
@@ -24,7 +24,7 @@ namespace Jellyfin.Plugin.SecureAuth.Api.OpenIdConnect;
 public class LinkController(
     IAuthorizationContext authContext,
     ILinkManager linkManager,
-    IStateManager stateManager,
+    IStateManager<TimedOidcState> stateManager,
     ILogger<LinkController> logger
 ) : ControllerBase
 {
@@ -65,7 +65,7 @@ public class LinkController(
             return BadRequest("No matching provider found");
         }
 
-        if (!stateManager.TryGetValue(authResponse.Data, out TimedAuthorizeState timedState))
+        if (!stateManager.TryGetValue(authResponse.Data, out TimedOidcState timedState))
         {
             return Problem("State not found");
         }
