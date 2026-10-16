@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta content='width=device-width, initial-scale=1' name='viewport'>
+    <style>
+        body {
+            background: #101010;
+            color: #d1cfce;
+            font-family: Noto Sans, Noto Sans HK, Noto Sans JP, Noto Sans KR, Noto Sans SC, Noto Sans TC, sans-serif;
+        }
+    </style>
+    <title>Logging in...</title>
+</head>
+<body>
+<p>Logging in...</p>
+<noscript>Please enable Javascript to complete the login</noscript>
+<script type="module">
+    import {getDeviceName, sleep} from 'CS_BASEURL/AuthViews/shared.js'
+
+    async function link(request) {
+        const jfCredentialsString = localStorage.getItem("jellyfin_credentials")
+
+        if (jfCredentialsString == null) return false;
+
+        const jfCredentials = JSON.parse(jfCredentialsString);
+        const jfUser = jfCredentials['Servers'][0]['UserId'];
+        const jfToken = jfCredentials['Servers'][0]['AccessToken'];
+
+        if (jfUser == null || jfToken == null) return false;
+
+        const url = 'CS_BASEURL/SecureAuth/OIDC/Link/CS_PROVIDER/' + jfUser;
+
+        const response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'Authorization': `MediaBrowser Client="${request.appName}", Device="${request.deviceName}", DeviceId="${request.deviceId}", Version="${request.appVersion}", Token="${jfToken}"`
+            },
+            body: JSON.stringify(request)
+        });
+
+        if (!response.ok) {
+            console.error('HTTP error:', response.status);
+            return false
+        }
+
+        return true
+    }
+
+    async function auth(request) {
+        // create clean state (remove old authentication attempts)
+        localStorage.removeItem('jellyfin_credentials');
+        document.getElementById('iframe-main').src = 'CS_BASEURL/web/index.html';
+
+        // If localStorage isn't initialized yet, wait until it is.
+        while (localStorage.getItem("_deviceId2") == null || localStorage.getItem("jellyfin_credentials") == null
+        || JSON.parse(localStorage.getItem("jellyfin_credentials"))['Servers'][0]['Id'] == null) {
+            await sleep(100);
+        }
+
+        const url = 'CS_BASEURL/SecureAuth/OIDC/Auth/CS_PROVIDER';
+        let response = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(request)
+        });
+
+        if (!response.ok) {
+            console.error('HTTP error:', response.status);
+            return false;
+        }
+
+        response = await response.json();
+
+        const userId = 'user-' + response['User']['Id'] + '-' + response['User']['ServerId'];
+        response['User']['EnableAutoLogin'] = true;
+        localStorage.setItem(userId, JSON.stringify(response['User']));
+
+        const jfCreds = JSON.parse(localStorage.getItem('jellyfin_credentials'));
+        jfCreds['Servers'][0]['AccessToken'] = response['AccessToken'];
+        jfCreds['Servers'][0]['UserId'] = response['User']['Id'];
+        localStorage.setItem('jellyfin_credentials', JSON.stringify(jfCreds));
+        localStorage.setItem('enableAutoLogin', 'true');
+
+        return true;
+    }
+
+    async function main() {
+        const Data = "CS_DATA";
+
+        const DeviceId = localStorage.getItem("_deviceId2");
+        const AppName = "Jellyfin Web";
+        const AppVersion = "12.0.0";
+        const DeviceName = getDeviceName();
+
+        const request = {DeviceId, AppName, AppVersion, DeviceName, Data};
+
+        let status;
+
+        if (CS_ISLINKING) {
+            status = await link(request);
+        } else {
+            status = await auth(request);
+        }
+
+        if (status) {
+            window.location.replace('CS_BASEURL/web/index.html');
+        } else {
+            document.body.innerHTML = "<p>Flow failed, check browser console for logs</h3>";
+        }
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+        main();
+    });
+</script>
+<iframe class='docs-texteventtarget-iframe' id='iframe-main' sandbox='allow-same-origin allow-forms allow-scripts'
+        src='' style='position: absolute;width:0;height:0;border:0;'></iframe>
+</body>
+</html>

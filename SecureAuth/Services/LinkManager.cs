@@ -1,0 +1,103 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+
+namespace Jellyfin.Plugin.SecureAuth.Services;
+
+/// <inheritdoc />
+public class LinkManager : ILinkManager
+{
+    /// <inheritdoc />
+    public bool TryGetLinks(string provider, out SerializableDictionary<string, Guid> links)
+    {
+        if (!SecureAuth.Instance.Configuration.Configs.TryGetValue(provider, out Config config))
+        {
+            links = new SerializableDictionary<string, Guid>();
+            return false;
+        }
+
+        links = config.Links ?? new SerializableDictionary<string, Guid>();
+        return true;
+    }
+
+    /// <inheritdoc />
+    public bool TryGetLink(string provider, string sub, out Guid userId)
+    {
+        if (!TryGetLinks(provider, out SerializableDictionary<string, Guid> links)
+            || !links.TryGetValue(sub, out userId))
+        {
+            userId = Guid.Empty;
+            return false;
+        }
+
+        return true;
+    }
+
+    /// <inheritdoc />
+    public bool TryCreateLink(string provider, string sub, Guid userId)
+    {
+        if (!TryGetLinks(provider, out SerializableDictionary<string, Guid> links))
+        {
+            return false;
+        }
+
+        links[sub] = userId;
+
+        return TryUpdateLinkConfig(provider, links);
+    }
+
+    /// <inheritdoc />
+    public bool TryUpdateLinkConfig(string provider, SerializableDictionary<string, Guid> links)
+    {
+        PluginConfiguration config = SecureAuth.Instance.Configuration;
+        if (!config.Configs.TryGetValue(provider, out _))
+        {
+            return false;
+        }
+
+        config.Configs[provider].Links = links;
+        SecureAuth.Instance.UpdateConfiguration(config);
+        return true;
+    }
+
+    /// <inheritdoc />
+    public bool TryDeleteLink(string provider, string sub)
+    {
+        if (!TryGetLinks(provider, out SerializableDictionary<string, Guid> links))
+        {
+            return false;
+        }
+
+        links.Remove(sub);
+
+        return TryUpdateLinkConfig(provider, links);
+    }
+
+    /// <inheritdoc />
+    public SerializableDictionary<string, IEnumerable<string>> GetLinksByUser(Guid userId)
+    {
+        SerializableDictionary<string, Config> providerList = SecureAuth.Instance.Configuration.Configs;
+        Dictionary<string, IEnumerable<string>> mappings = providerList
+            .ToDictionary(
+                provider => provider.Key,
+                provider => provider.Value.Links
+                    .Where(link => link.Value == userId)
+                    .Select(link => link.Key));
+
+        return new SerializableDictionary<string, IEnumerable<string>>(mappings);
+    }
+
+    /// <inheritdoc />
+    public void DeleteLinksToUser(Guid userId)
+    {
+        SerializableDictionary<string, IEnumerable<string>> links = GetLinksByUser(userId);
+
+        foreach (KeyValuePair<string, IEnumerable<string>> providerMap in links)
+        {
+            foreach (string sub in providerMap.Value)
+            {
+                TryDeleteLink(providerMap.Key, sub);
+            }
+        }
+    }
+}
