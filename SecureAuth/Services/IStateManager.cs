@@ -54,6 +54,11 @@ public abstract class TimedFlowState(DateTime created)
     private DateTime Created { get; } = created;
 
     /// <summary>
+    ///     Cookie to bind to the browser.
+    /// </summary>
+    public string Cookie { get; set; }
+
+    /// <summary>
     ///     Check if the flow is expired.
     /// </summary>
     /// <param name="lifetime">How long the flow should be valid for</param>
@@ -65,9 +70,9 @@ public abstract class TimedFlowState(DateTime created)
     /// <summary>
     ///     Check if the flow is still valid.
     /// </summary>
-    public virtual bool IsValid()
+    public virtual bool IsValid(string cookie)
     {
-        return !IsExpired();
+        return !IsExpired() && Cookie == cookie;
     }
 }
 
@@ -77,22 +82,27 @@ public abstract class TimedFlowState(DateTime created)
 public class TimedQrState(DateTime created) : TimedFlowState(created)
 {
     /// <summary>
-    ///     The id of the device that scanned the QR code.
+    ///     The id of the user that scanned the QR code.
+    /// </summary>
+    public Guid UserId { get; set; }
+
+    /// <summary>
+    ///     The id of the device that wants to authenticate.
     /// </summary>
     public string DeviceId { get; set; }
 
     /// <summary>
-    ///     The name of the device that scanned the QR code.
+    ///     The name of the device that wants to authenticate.
     /// </summary>
     public string DeviceName { get; set; }
 
     /// <summary>
-    ///     The name of the app that scanned the QR code.
+    ///     The name of the app that wants to authenticate.
     /// </summary>
     public string AppName { get; set; }
 
     /// <summary>
-    ///     The version of the app that scanned the QR code.
+    ///     The version of the app that wants to authenticate.
     /// </summary>
     public string AppVersion { get; set; }
 
@@ -100,6 +110,12 @@ public class TimedQrState(DateTime created) : TimedFlowState(created)
     ///     6 digit code shown to both devices.
     /// </summary>
     public string Fingerprint { get; set; }
+
+    /// <summary>
+    ///     IP address of the device that wants to authenticate.
+    /// </summary>
+    public string IP { get; set; }
+
 
     /// <summary>
     ///     What the current state of the QR flow is.
@@ -165,11 +181,6 @@ public class TimedOidcState(AuthorizeState state, DateTime created) : TimedFlowS
     public string Provider { get; init; }
 
     /// <summary>
-    ///     Cookie to bind to the browser.
-    /// </summary>
-    public string Cookie { get; set; }
-
-    /// <summary>
     ///     Gets or sets the folders the user is allowed access to.
     /// </summary>
     public List<string> DefaultAllowedFolders { get; set; }
@@ -199,6 +210,6 @@ public class TimedOidcState(AuthorizeState state, DateTime created) : TimedFlowS
     /// </summary>
     public bool IsValid(string provider, string flowCookie)
     {
-        return Valid && !IsExpired() && Provider == provider && Cookie == flowCookie;
+        return Valid && IsValid(flowCookie) && Provider == provider;
     }
 }

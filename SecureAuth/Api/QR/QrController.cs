@@ -1,4 +1,5 @@
 using System;
+using System.Buffers.Text;
 using System.Security.Cryptography;
 using System.Threading.Tasks;
 using Jellyfin.Plugin.SecureAuth.Extensions;
@@ -7,6 +8,7 @@ using MediaBrowser.Controller.Authentication;
 using MediaBrowser.Controller.Net;
 using MediaBrowser.Controller.Session;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Logging;
 using QRCoder;
@@ -34,20 +36,33 @@ public class QrController(
     {
         stateManager.Invalidate();
 
-        string pairingCode = Convert.ToBase64String(RandomNumberGenerator.GetBytes(128));
-        string url = Request.GetRequestBase() + "/SecureAuth/QR/Approve?pairingCode" + pairingCode;
+        string pairingCode = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(128));
+        string url = Request.GetRequestBase() + "/AuthViews/QR/Approve?pairingCode=" + pairingCode;
         string svgQr = new SvgQRCode(QRCodeGenerator.GenerateQrCode(url, QRCodeGenerator.ECCLevel.Q)).GetGraphic();
 
         string fingerprint = Convert.ToString(RandomNumberGenerator.GetInt32(0, 1000000)).PadLeft(6, '0');
 
+        string flowCookie = Guid.NewGuid().ToString("N");
+        Response.Cookies.Append("qr_flow",
+            flowCookie,
+            new CookieOptions
+            {
+                HttpOnly = true,
+                SameSite = SameSiteMode.Lax,
+                MaxAge = TimeSpan.FromMinutes(5),
+                Secure = Request.IsHttps,
+            });
+
         stateManager.TryAdd(pairingCode,
             new TimedQrState(DateTime.UtcNow)
             {
+                Cookie = flowCookie,
                 DeviceId = deviceData.DeviceId,
                 DeviceName = deviceData.DeviceName,
                 AppName = deviceData.AppName,
                 AppVersion = deviceData.AppVersion,
                 Fingerprint = fingerprint,
+                IP = Request.HttpContext.Connection.RemoteIpAddress?.ToString(),
             });
 
         logger.LogInformation("Created QR code for {deviceName} ({appName} {appVersion})",
@@ -55,17 +70,19 @@ public class QrController(
             deviceData.AppName,
             deviceData.AppVersion);
 
-        return Ok(new { svgQr, fingerprint });
+        return Ok(new { svgQr, fingerprint, pairingCode });
     }
 
     /// <summary>
+    ///     Check the status of the login.
     /// </summary>
     /// <param name="pairCode"></param>
+    /// <param name="deviceId"></param>
     [HttpGet]
     [Route("Poll")]
-    public ActionResult Poll([FromQuery] string pairCode)
+    public ActionResult Poll([FromQuery] string pairCode, [FromQuery] string deviceId)
     {
-        if (!stateManager.TryGetValue(pairCode, out TimedQrState timedState))
+        if (!stateManager.TryGetValue(pairCode, out TimedQrState timedState) || timedState.DeviceId != deviceId)
         {
             return BadRequest("Invalid state");
         }
@@ -87,25 +104,24 @@ public class QrController(
     [Route("Complete")]
     public async Task<ActionResult> Complete([FromBody] CompletionData completionData)
     {
-        if (!stateManager.TryGetValue(completionData.PairCode, out TimedQrState timedState))
+        if (!stateManager.TryGetValue(completionData.PairCode, out TimedQrState timedState)
+            || timedState.State != QrCodeState.Approved || timedState.IsExpired()
+            || timedState.DeviceId != completionData.DeviceId)
         {
-            return BadRequest("Invalid state");
+            return BadRequest("Invalid or not approved state");
         }
-
-        AuthorizationInfo authorizationInfo =
-            await authorizationContext.GetAuthorizationInfo(HttpContext).ConfigureAwait(false);
-        Guid userId = authorizationInfo.UserId;
-
 
         var authRequest = new AuthenticationRequest
         {
-            UserId = userId,
+            UserId = timedState.UserId,
             App = timedState.AppName,
             AppVersion = timedState.AppVersion,
             DeviceId = timedState.DeviceId,
             DeviceName = timedState.DeviceName,
             RemoteEndPoint = HttpContext.Connection.RemoteIpAddress?.ToString(),
         };
+
+        stateManager.TryRemove(completionData.PairCode, out _);
 
         AuthenticationResult result = await sessionManager.AuthenticateDirect(authRequest).ConfigureAwait(false);
         return Ok(result);
@@ -114,7 +130,7 @@ public class QrController(
     /// <summary>
     ///     Cancel the QR code flow.
     /// </summary>
-    /// <param name="pairCode"></param>
+    /// <param name="pairCode">the pairing data</param>
     [HttpPost]
     [Route("Cancel")]
     public ActionResult Cancel([FromQuery] string pairCode)
@@ -126,26 +142,29 @@ public class QrController(
     /// <summary>
     ///     Allow the scanning device to approve/deny the login.
     /// </summary>
-    /// <param name="approvalData">The pairing id and action</param>
     [Authorize]
     [HttpPost]
     [Route("Approve")]
-    public ActionResult Approve([FromBody] ApprovalData approvalData)
+    public async Task<ActionResult> Approve([FromQuery] string pairingCode, [FromQuery] bool action)
     {
-        stateManager.Invalidate();
-        if (!stateManager.TryGetValue(approvalData.PairCode, out TimedQrState timedState))
+        if (!stateManager.TryGetValue(pairingCode, out TimedQrState timedState)
+            || timedState.State != QrCodeState.Pending)
         {
             return BadRequest("Invalid state");
         }
 
-        timedState.State = approvalData.Action;
+        AuthorizationInfo authorizationInfo =
+            await authorizationContext.GetAuthorizationInfo(HttpContext).ConfigureAwait(false);
+
+        timedState.UserId = authorizationInfo.UserId;
+        timedState.State = action ? QrCodeState.Approved : QrCodeState.Denied;
         return Ok();
     }
 
     /// <summary>
     ///     Allow the scanning device to get the device info.
     /// </summary>
-    /// <param name="pairCode"></param>
+    /// <param name="pairCode">the pairing code</param>
     [HttpPost]
     [Route("Info")]
     public ActionResult Info([FromQuery] string pairCode)
@@ -161,6 +180,7 @@ public class QrController(
             timedState.AppVersion,
             timedState.AppName,
             timedState.Fingerprint,
+            timedState.IP,
         });
     }
 }
@@ -180,10 +200,3 @@ public record DeviceData(string DeviceId, string DeviceName, string AppName, str
 /// <param name="DeviceId">The device ID of the client.</param>
 /// <param name="PairCode">The pair code of the flow.</param>
 public record CompletionData(string DeviceId, string PairCode);
-
-/// <summary>
-///     The data the client should pass send to complete the login
-/// </summary>
-/// <param name="Action">The action to take (Approve/Deny).</param>
-/// <param name="PairCode">The pair code of the flow.</param>
-public record ApprovalData(string PairCode, QrCodeState Action);
