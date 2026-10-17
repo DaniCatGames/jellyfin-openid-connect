@@ -57,7 +57,10 @@ export class ApiClient {
         if (dataType === "json") headers["Accept"] = "application/json";
         this.setRequestHeaders(headers);
         const init = { method: type, credentials: "same-origin", headers };
-        if (data != null) init.body = typeof data === "string" ? data : JSON.stringify(data);
+        if (data != null) {
+            init.body = typeof data === "string" ? data : JSON.stringify(data);
+            headers["Content-Type"] = contentType || "application/json";
+        }
         const resp = await fetch(url, init);
         if (resp.status >= 400) throw resp; // library rejects the Response
         return dataType === "json" || (resp.headers.get("Content-Type") || "").startsWith("application/json")

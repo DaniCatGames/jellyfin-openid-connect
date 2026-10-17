@@ -1,82 +1,20 @@
-import api from "./api.js";
+import * as api from "./api.js";
 import { getDeviceName, sleep } from "./shared.js";
 
 window.jellyfinApiclient = api;
-console.log(api);
 
-// https://github.com/jellyfin/jellyfin-web/blob/9067b0e397cc8b38635d661ce86ddd83194f3202/src/scripts/clientUtils.js#L19-L76
-export async function serverAddress({ basePath = "/web" }) {
+export async function serverAddress() {
     const apiClient = window.ApiClient;
 
     if (apiClient) {
-        return Promise.resolve(apiClient.serverAddress());
+        return apiClient.serverAddress();
     }
 
-    const urls = [];
+    const index = window.location.pathname.indexOf("/AuthViews/");
 
-    const getViewUrl = (basePath) => {
-        let url;
-        const index = window.location.href.toLowerCase().lastIndexOf(basePath.toLowerCase());
-
-        if (index !== -1) {
-            url = window.location.href.substring(0, index);
-        } else {
-            // Return nothing, let another method handle it
-            url = undefined;
-        }
-
-        return url;
-    };
-
-    if (urls.length === 0) {
-        // Otherwise use computed base URL
-        let url;
-
-        url = getViewUrl(basePath) ?? getViewUrl("/web") ?? window.location.origin;
-
-        // Don't use bundled app URL (file:) as server URL
-        if (url.startsWith("file:")) {
-            return Promise.resolve();
-        }
-
-        urls.push(url);
-    }
-
-    console.debug("URL candidates:", urls);
-
-    const promises = urls.map((url) => {
-        return fetch(`${url}/System/Info/Public`)
-            .then((resp) => {
-                return {
-                    url: url,
-                    response: resp,
-                };
-            })
-            .catch(() => {
-                return Promise.resolve();
-            });
-    });
-
-    return Promise.all(promises)
-        .then((responses) => {
-            responses = responses.filter((obj) => obj && obj.response.ok);
-            return Promise.all(
-                responses.map((obj) => {
-                    return {
-                        url: obj.url,
-                        config: obj.response.json(),
-                    };
-                }),
-            );
-        })
-        .then((configs) => {
-            const selection = configs.find((obj) => !obj.config.StartupWizardCompleted) || configs[0];
-            return Promise.resolve(selection?.url);
-        })
-        .catch((error) => {
-            console.log(error);
-            return Promise.resolve();
-        });
+    return index !== -1
+        ? window.location.origin + window.location.pathname.substring(0, index)
+        : window.location.origin;
 }
 
 function getDeviceId() {
@@ -84,12 +22,15 @@ function getDeviceId() {
 }
 
 async function awaitLocalStorage() {
-    while (
-        localStorage.getItem("_deviceId2") == null ||
-        localStorage.getItem("jellyfin_credentials") == null ||
-        JSON.parse(localStorage.getItem("jellyfin_credentials"))["Servers"][0]["Id"] == null
-    ) {
-        // If localStorage isn't initialized yet, try again.
+    const ready = () => {
+        try {
+            const creds = JSON.parse(localStorage.getItem("jellyfin_credentials"));
+            return localStorage.getItem("_deviceId2") != null && creds?.Servers?.[0]?.Id != null;
+        } catch {
+            return false;
+        }
+    };
+    while (!ready()) {
         await sleep(100);
     }
 }
@@ -100,9 +41,16 @@ await awaitLocalStorage();
 
 const credentials = new api.Credentials();
 
-const server = await serverAddress({ basePath: "/" });
+const server = await serverAddress();
+if (!server) {
+    throw new Error("Could not determine the Jellyfin server address");
+}
 
 const infoResponse = await fetch(`${server}/System/Info/Public`);
+if (!infoResponse.ok) {
+    throw new Error(`Could not reach the Jellyfin server (${infoResponse.status})`);
+}
+
 const serverInfo = await infoResponse.json();
 const activeServerId = serverInfo.Id;
 
