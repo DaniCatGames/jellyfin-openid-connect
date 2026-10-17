@@ -785,6 +785,14 @@
                 "timestamp": "2026-07-12T09:49:52Z"
             },
             {
+                "version": "1.1.0.110",
+                "changelog": "",
+                "targetAbi": "12.0.0",
+                "sourceUrl": "https://github.com/DaniCatGames/jellyfin-openid-connect/releases/download/unstable/secureauth_1.1.0.110.zip",
+                "checksum": "f7d1ee081010c2e8f022ea0793f0ab13",
+                "timestamp": "2026-10-17T15:26:33Z"
+            },
+            {
                 "version": "1.1.0.109",
                 "changelog": "",
                 "targetAbi": "12.0.0",
