@@ -116,6 +116,11 @@ public class SecureAuth : BasePlugin<PluginConfiguration>, IPlugin, IHasWebPages
                 Name = "QR/Web",
                 EmbeddedResourcePath = $"{GetType().Namespace}.Views.QR.web.html",
             },
+            new PluginPageInfo
+            {
+                Name = "QR/Approve",
+                EmbeddedResourcePath = $"{GetType().Namespace}.Views.QR.approve.html",
+            },
         ];
     }
 }

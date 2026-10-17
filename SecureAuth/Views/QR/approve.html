@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta content='width=device-width, initial-scale=1' name='viewport'>
+    <style>
+        body {
+            background: #101010;
+            color: #d1cfce;
+            font-family: Noto Sans, Noto Sans HK, Noto Sans JP, Noto Sans KR, Noto Sans SC, Noto Sans TC, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card {
+            text-align: center;
+            padding: 32px 20px;
+            max-width: 420px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 1.35rem;
+            font-weight: 500;
+            margin: 0 0 20px;
+        }
+
+        .hint {
+            font-size: 0.85rem;
+            opacity: 0.7;
+            margin: 0 0 8px;
+        }
+
+        .box {
+            background: #1c1c1e;
+            border-radius: 8px;
+            padding: 14px;
+            margin: 14px 0;
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .box .label {
+            opacity: 0.6;
+            font-size: 0.8rem;
+        }
+
+        #fingerprint {
+            font-size: 2.2rem;
+            font-weight: 700;
+            letter-spacing: 0.3em;
+            margin: 10px 0 14px;
+            color: #00a4dc;
+        }
+
+        .account {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            margin: 16px 0;
+        }
+
+        #account-avatar, .avatar-fallback {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            flex: none;
+        }
+
+        .avatar-fallback {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #00a4dc;
+            color: #ffffff;
+            font-weight: 700;
+            font-size: 1.3rem;
+        }
+
+        #account-name {
+            font-size: 1.1rem;
+            font-weight: 500;
+        }
+
+        button {
+            background: #00a4dc;
+            color: #ffffff;
+            border: 0;
+            border-radius: 6px;
+            padding: 12px 22px;
+            font-size: 1rem;
+            font-family: inherit;
+            cursor: pointer;
+            margin: 4px 2px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        button.secondary {
+            background: #2a2a2a;
+            color: #d1cfce;
+        }
+
+        button.linklike {
+            background: transparent;
+            color: #00a4dc;
+            font-size: 0.9rem;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: default;
+        }
+
+        button:hover:not(:disabled) {
+            filter: brightness(1.1);
+        }
+
+        input {
+            background: #1c1c1e;
+            border: 1px solid #2a2a2a;
+            border-radius: 6px;
+            color: #d1cfce;
+            font-family: inherit;
+            font-size: 1rem;
+            padding: 12px 14px;
+            margin: 4px 0;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        input:focus {
+            outline: 1px solid #00a4dc;
+            border-color: #00a4dc;
+        }
+
+        #login-error {
+            color: #ff6c6c;
+            font-size: 0.9rem;
+            margin: 8px 0 0;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+    <title>Approve sign-in</title>
+</head>
+<body>
+<div class="card">
+    <h1>Approve sign-in</h1>
+
+    <div id="stage-loading">
+        <p class="hint">Checking sign-in request…</p>
+    </div>
+
+    <div class="hidden" id="stage-approve">
+        <p class="hint"><b id="info-device"></b> wants to sign in to your Jellyfin server.</p>
+        <div class="box">
+            <div><span class="label">App: </span><span id="info-app"></span></div>
+            <div><span class="label">IP: </span><span id="info-ip"></span></div>
+        </div>
+        <p class="hint">Make sure this matches the code shown on the other device:</p>
+        <div id="fingerprint"></div>
+        <div class="account">
+            <img alt="" class="hidden" id="account-avatar">
+            <div class="avatar-fallback hidden" id="account-initial"></div>
+            <span id="account-name"></span>
+        </div>
+        <button id="approve">Yes, sign in</button>
+        <button class="secondary" id="deny">No, deny</button>
+        <button class="linklike" id="switch">Not you? Use a different account</button>
+    </div>
+
+    <div class="hidden" id="stage-login">
+        <p class="hint"><b id="info-device-login"></b> wants to sign in. Log in first to approve it.</p>
+        <div class="box">
+            <div><span class="label">App: </span><span id="info-app-login"></span></div>
+            <div><span class="label">IP: </span><span id="info-ip-login"></span></div>
+        </div>
+        <p class="hint">Make sure this matches the code shown on the other device:</p>
+        <div id="fingerprint"></div>
+        <form id="login-form">
+            <input autocomplete="username" id="login-username" placeholder="Username">
+            <input autocomplete="current-password" id="login-password" placeholder="Password" type="password">
+            <button id="login-submit" type="submit">Log in</button>
+        </form>
+        <p class="hidden" id="login-error"></p>
+    </div>
+
+    <div class="hidden" id="stage-result">
+        <p id="result-text"></p>
+    </div>
+
+    <div class="hidden" id="stage-expired">
+        <p>This sign-in request is invalid or has expired.</p>
+        <p class="hint">Generate a new code on the device you want to sign in on.</p>
+    </div>
+
+    <div class="hidden" id="stage-error">
+        <p id="error-text">Something went wrong.</p>
+    </div>
+</div>
+
+<noscript>Please enable Javascript to approve this sign-in.</noscript>
+
+<script>
+    setTimeout(function () {
+        if (!window.__qrApproveReady) {
+            document.getElementById('stage-loading').classList.add('hidden');
+            document.getElementById('error-text').textContent = 'This page is taking too long to load.';
+            document.getElementById('stage-error').classList.remove('hidden');
+        }
+    }, 15000);
+</script>
+
+<script type="module">
+    window.__qrApproveReady = true;
+
+    import apiClient from '../apiClient.js';
+
+    const $ = (id) => document.getElementById(id);
+    const stages = ['stage-loading', 'stage-approve', 'stage-login', 'stage-result', 'stage-expired', 'stage-error'];
+
+    function showOnly(...ids) {
+        for (const stage of stages) {
+            $(stage).classList.toggle('hidden', !ids.includes(stage));
+        }
+    }
+
+    function fail(message) {
+        $('error-text').textContent = message;
+        showOnly('stage-error');
+    }
+
+    // --- server calls (all through the shared apiClient) ----------------------
+
+    let pairingCode = null;
+    let serverInfo = null;
+    let currentUser = null;
+
+    function fetchFlowInfo() {
+        return apiClient.fetch({
+            url: apiClient.getUrl('SecureAuth/QR/Info', {pairCode: pairingCode}),
+            type: 'POST',
+            dataType: 'json'
+        });
+    }
+
+    function renderDevice(info, stageSuffix) {
+        $('info-device' + stageSuffix).textContent = info.DeviceName || 'A device';
+        $('info-app' + stageSuffix).textContent =
+            (info.AppName || 'Unknown app') + (info.AppVersion ? ' ' + info.AppVersion : '');
+        $('info-ip' + stageSuffix).textContent = info.IP || 'unknown';
+    }
+
+    // Returns the logged-in user, or null. A stored token that the server rejects
+    // is treated as logged out and cleared.
+    async function getCurrentUser() {
+        if (!apiClient.getCurrentUserId()) return null;
+        try {
+            return await apiClient.getJSON(apiClient.getUrl('Users/Me'));
+        } catch (error) {
+            if (error && typeof error.status === 'number') clearSession();
+            return null;
+        }
+    }
+
+    function clearSession() {
+        try {
+            const creds = JSON.parse(localStorage.getItem('jellyfin_credentials'));
+            const entry = creds?.Servers?.find((e) => e.Id === serverInfo?.Id);
+            if (entry) {
+                delete entry.AccessToken;
+                delete entry.UserId;
+                localStorage.setItem('jellyfin_credentials', JSON.stringify(creds));
+            }
+        } catch {
+            // ignore - nothing to clear
+        }
+        apiClient.setAuthenticationInfo(null, null);
+    }
+
+    // Same shape as web.html's saveCredentials, so a login here also carries over
+    // to the Jellyfin web app on this device.
+    function saveCredentials(result) {
+        const serverId = result.User.ServerId || serverInfo.Id;
+
+        result.User.EnableAutoLogin = true;
+        localStorage.setItem('user-' + result.User.Id + '-' + serverId, JSON.stringify(result.User));
+
+        const creds = JSON.parse(localStorage.getItem('jellyfin_credentials')) || {};
+        creds.Servers ||= [];
+
+        let server = creds.Servers.find((entry) => entry.Id === serverInfo.Id);
+        if (!server) {
+            server = {
+                Id: serverInfo.Id,
+                Name: serverInfo.ServerName,
+                ManualAddress: apiClient.serverAddress(),
+                DateLastAccessed: new Date().toISOString()
+            };
+            creds.Servers.unshift(server);
+        }
+
+        server.AccessToken = result.AccessToken;
+        server.UserId = result.User.Id;
+        server.DateLastAccessed = new Date().toISOString();
+
+        localStorage.setItem('jellyfin_credentials', JSON.stringify(creds));
+        localStorage.setItem('enableAutoLogin', 'true');
+    }
+
+    // --- stages ----------------------------------------------------------------
+
+    function showApprove(user) {
+        currentUser = user;
+        $('account-name').textContent = user.Name || 'Unknown user';
+
+        if (user.PrimaryImageTag) {
+            $('account-avatar').src = apiClient.getUrl('Users/' + user.Id + '/Images/Primary', {
+                tag: user.PrimaryImageTag,
+                maxWidth: 96
+            });
+            $('account-avatar').classList.remove('hidden');
+            $('account-initial').classList.add('hidden');
+        } else {
+            $('account-initial').textContent = (user.Name || '?').charAt(0).toUpperCase();
+            $('account-initial').classList.remove('hidden');
+            $('account-avatar').classList.add('hidden');
+        }
+
+        showOnly('stage-approve');
+    }
+
+    function showLogin() {
+        $('login-error').classList.add('hidden');
+        showOnly('stage-login');
+    }
+
+    async function login(event) {
+        event.preventDefault();
+        const username = $('login-username').value.trim();
+        const password = $('login-password').value;
+        if (!username) return;
+
+        $('login-submit').disabled = true;
+        $('login-error').classList.add('hidden');
+
+        try {
+            const result = await apiClient.fetch({
+                url: apiClient.getUrl('Users/AuthenticateByName'),
+                type: 'POST',
+                dataType: 'json',
+                contentType: 'application/json',
+                data: {Username: username, Pw: password}
+            });
+
+            if (!result?.AccessToken || !result?.User) throw new Error('Unexpected response');
+
+            apiClient.setAuthenticationInfo(result.AccessToken, result.User.Id);
+            saveCredentials(result);
+            showApprove(result.User);
+        } catch (error) {
+            $('login-error').textContent = error?.status === 401
+                ? 'Invalid username or password.'
+                : 'Could not sign in. Please try again.';
+            $('login-error').classList.remove('hidden');
+        } finally {
+            $('login-submit').disabled = false;
+        }
+    }
+
+    async function approve(action) {
+        $('approve').disabled = true;
+        $('deny').disabled = true;
+
+        try {
+            // Note: the Approve endpoint takes "pairingCode" (not "pairCode").
+            await apiClient.fetch({
+                url: apiClient.getUrl('SecureAuth/QR/Approve', {
+                    pairingCode: pairingCode,
+                    action: String(action)
+                }),
+                type: 'POST'
+            });
+
+            $('result-text').textContent = action
+                ? 'Approved. You can close this page — ' +
+                ($('info-device').textContent || 'the device') + ' will sign in shortly.'
+                : 'Sign-in declined. You can close this page.';
+            showOnly('stage-result');
+        } catch (error) {
+            if (error && typeof error.status === 'number') {
+                fail('This sign-in request is no longer valid.');
+            } else {
+                fail('Could not reach the server. Please try again.');
+            }
+            $('approve').disabled = false;
+            $('deny').disabled = false;
+        }
+    }
+
+    // --- flow ------------------------------------------------------------------
+
+    async function main() {
+        pairingCode = new URLSearchParams(window.location.search).get('pairingCode');
+        if (!pairingCode) {
+            fail('This link is missing its sign-in request. Scan the QR code again.');
+            return;
+        }
+
+        try {
+            serverInfo = await apiClient.getJSON(apiClient.getUrl('System/Info/Public'));
+        } catch (error) {
+            fail('Could not reach the Jellyfin server.');
+            return;
+        }
+
+        let info;
+        try {
+            info = await fetchFlowInfo();
+        } catch (error) {
+            // 400: unknown/expired pairing code
+            showOnly('stage-expired');
+            return;
+        }
+
+        renderDevice(info, '');
+        renderDevice(info, '-login');
+        $('fingerprint').textContent = info.Fingerprint || '······';
+
+        const user = await getCurrentUser();
+        if (user) {
+            showApprove(user);
+        } else {
+            showLogin();
+        }
+    }
+
+    $('login-form').addEventListener('submit', login);
+    $('approve').addEventListener('click', () => approve(true));
+    $('deny').addEventListener('click', () => approve(false));
+    $('switch').addEventListener('click', () => {
+        clearSession();
+        showLogin();
+    });
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', main);
+    } else {
+        main();
+    }
+</script>
+</body>
+</html>

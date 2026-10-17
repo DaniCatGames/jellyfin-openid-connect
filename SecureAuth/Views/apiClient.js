@@ -18,19 +18,17 @@ export async function serverAddress() {
 }
 
 function getDeviceId() {
-    return localStorage.getItem("_deviceId2");
+    let id = localStorage.getItem("_deviceId2");
+    if (!id) {
+        id = crypto.randomUUID();
+        localStorage.setItem("_deviceId2", id);
+    }
+    return id;
 }
 
 async function awaitLocalStorage() {
-    const ready = () => {
-        try {
-            const creds = JSON.parse(localStorage.getItem("jellyfin_credentials"));
-            return localStorage.getItem("_deviceId2") != null && creds?.Servers?.[0]?.Id != null;
-        } catch {
-            return false;
-        }
-    };
-    while (!ready()) {
+    const deadline = Date.now() + 2000;
+    while (localStorage.getItem("_deviceId2") == null && Date.now() < deadline) {
         await sleep(100);
     }
 }
