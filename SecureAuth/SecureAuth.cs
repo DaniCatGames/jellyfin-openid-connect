@@ -98,7 +98,7 @@ public class SecureAuth : BasePlugin<PluginConfiguration>, IPlugin, IHasWebPages
             },
             new PluginPageInfo
             {
-                Name = "ApiClient.js",
+                Name = "apiClient.js",
                 EmbeddedResourcePath = $"{GetType().Namespace}.Views.apiClient.js",
             },
             new PluginPageInfo
@@ -110,6 +110,11 @@ public class SecureAuth : BasePlugin<PluginConfiguration>, IPlugin, IHasWebPages
             {
                 Name = "shared.js",
                 EmbeddedResourcePath = $"{GetType().Namespace}.Views.shared.js",
+            },
+            new PluginPageInfo
+            {
+                Name = "QR/Web",
+                EmbeddedResourcePath = $"{GetType().Namespace}.Views.QR.web.html",
             },
         ];
     }

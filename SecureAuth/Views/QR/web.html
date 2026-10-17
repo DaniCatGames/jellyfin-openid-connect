@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta content='width=device-width, initial-scale=1' name='viewport'>
+    <style>
+        body {
+            background: #101010;
+            color: #d1cfce;
+            font-family: Noto Sans, Noto Sans HK, Noto Sans JP, Noto Sans KR, Noto Sans SC, Noto Sans TC, sans-serif;
+            margin: 0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .card {
+            text-align: center;
+            padding: 32px 24px;
+            max-width: 420px;
+            width: 100%;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 1.35rem;
+            font-weight: 500;
+            margin: 0 0 20px;
+        }
+
+        #qr-box {
+            display: inline-block;
+            background: #ffffff; /* QR must sit on a light background to scan reliably */
+            border-radius: 8px;
+            padding: 14px;
+        }
+
+        #qr-box svg {
+            display: block;
+            width: 220px;
+            height: 220px;
+        }
+
+        #fingerprint {
+            font-size: 2.2rem;
+            font-weight: 700;
+            letter-spacing: 0.3em;
+            margin: 18px 0 6px;
+            color: #00a4dc;
+        }
+
+        .hint {
+            font-size: 0.85rem;
+            opacity: 0.7;
+            margin: 0 0 8px;
+        }
+
+        #status {
+            margin: 18px 0;
+            min-height: 1.4em;
+        }
+
+        .spinner {
+            display: inline-block;
+            width: 14px;
+            height: 14px;
+            margin-right: 8px;
+            border: 2px solid rgba(0, 164, 220, 0.3);
+            border-top-color: #00a4dc;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            vertical-align: -2px;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        button {
+            background: #00a4dc;
+            color: #ffffff;
+            border: 0;
+            border-radius: 6px;
+            padding: 10px 22px;
+            font-size: 1rem;
+            font-family: inherit;
+            cursor: pointer;
+            margin: 4px;
+        }
+
+        button.secondary {
+            background: #2a2a2a;
+            color: #d1cfce;
+        }
+
+        button:hover {
+            filter: brightness(1.1);
+        }
+
+        .hidden {
+            display: none !important;
+        }
+    </style>
+    <title>Sign in with a QR code</title>
+</head>
+<body>
+<div class="card">
+    <h1>Sign in with a QR code</h1>
+
+    <div id="stage-qr">
+        <div aria-label="QR code" id="qr-box" role="img"></div>
+        <div id="fingerprint">&nbsp;</div>
+        <p class="hint">Scan this with the Jellyfin app on your phone.</p>
+        <p class="hint">Make sure the code shown on your phone matches the one above.</p>
+    </div>
+
+    <div class="hidden" id="stage-waiting">
+        <p id="status"><span class="spinner"></span><span id="status-text">Waiting for approval…</span></p>
+        <button class="secondary" id="cancel">Cancel</button>
+    </div>
+
+    <div class="hidden" id="stage-denied">
+        <p>Sign-in was declined on your phone.</p>
+        <button class="restart">Try again</button>
+    </div>
+
+    <div class="hidden" id="stage-expired">
+        <p>This code has expired.</p>
+        <button class="restart">Generate a new code</button>
+    </div>
+
+    <div class="hidden" id="stage-error">
+        <p id="error-text">Something went wrong.</p>
+        <button class="restart">Try again</button>
+    </div>
+
+    <div class="hidden" id="stage-hang">
+        <p>This page needs to be opened from the Jellyfin login screen.</p>
+        <button class="restart" onclick="location.reload()">Reload</button>
+    </div>
+</div>
+
+<noscript>Please enable Javascript to sign in with a QR code.</noscript>
+
+<script>
+    // apiClient.js waits for the web app to initialize localStorage before its import
+    // resolves. If this page was opened standalone, tell the user instead of hanging.
+    setTimeout(function () {
+        if (!window.__qrFlowReady) {
+            ['stage-qr', 'stage-waiting'].forEach(function (id) {
+                document.getElementById(id).classList.add('hidden');
+            });
+            document.getElementById('stage-hang').classList.remove('hidden');
+        }
+    }, 15000);
+</script>
+
+<script type="module">
+    // Adjust the relative paths if this page isn't served next to apiClient.js/shared.js.
+    window.__qrFlowReady = true;
+
+    import apiClient from '../apiClient.js';
+    import {getDeviceName, sleep} from '../shared.js';
+
+    const POLL_INTERVAL_MS = 2000;
+    const MAX_POLL_MS = 6 * 60 * 1000; // server expires flows after 5 minutes
+
+    // --- helpers -------------------------------------------------------------
+
+    const $ = (id) => document.getElementById(id);
+    const stages = ['stage-qr', 'stage-waiting', 'stage-denied', 'stage-expired', 'stage-error', 'stage-hang'];
+
+    function showOnly(...ids) {
+        for (const stage of stages) {
+            $(stage).classList.toggle('hidden', !ids.includes(stage));
+        }
+    }
+
+    function setStatus(text, spinner = true) {
+        $('status-text').textContent = text;
+        $('status').querySelector('.spinner').classList.toggle('hidden', !spinner);
+    }
+
+    function fail(message) {
+        $('error-text').textContent = message;
+        showOnly('stage-error');
+    }
+
+    function deviceId() {
+        // apiClient.js guarantees _deviceId2 exists (it waits for the web app to set it).
+        return localStorage.getItem('_deviceId2');
+    }
+
+    // Poll may return the enum as "Pending"/"pending" or 0-3 depending on the server's
+    // JSON options - normalize everything to lowercase.
+    function normalizeQrState(value) {
+        const byNumber = {0: 'pending', 1: 'approved', 2: 'denied', 3: 'expired'};
+        return typeof value === 'number' ? byNumber[value] : String(value).toLowerCase();
+    }
+
+    // --- server calls (all through the shared apiClient) ----------------------
+
+    async function getServerInfo() {
+        return apiClient.getJSON(apiClient.getUrl('System/Info/Public'));
+    }
+
+    async function createFlow(serverInfo) {
+        return apiClient.fetch({
+            url: apiClient.getUrl('SecureAuth/QR/Create'),
+            type: 'POST',
+            dataType: 'json',
+            contentType: 'application/json',
+            data: {
+                DeviceId: deviceId(),
+                DeviceName: getDeviceName(),
+                AppName: 'Jellyfin Web',
+                AppVersion: serverInfo.Version
+            }
+        });
+    }
+
+    async function pollFlow() {
+        const deadline = Date.now() + MAX_POLL_MS;
+        let failures = 0;
+
+        while (Date.now() < deadline) {
+            try {
+                const state = normalizeQrState(await apiClient.getJSON(apiClient.getUrl('SecureAuth/QR/Poll', {
+                    pairCode: pairingCode,
+                    deviceId: deviceId()
+                })));
+
+                failures = 0;
+                if (state !== 'pending') return state;
+            } catch (error) {
+                // apiClient throws the Response on >= 400. Poll returns 400 when the
+                // flow no longer exists (cancelled elsewhere) - stop waiting.
+                if (error && typeof error.status === 'number') return 'expired';
+                if (++failures >= 3) throw error;
+            }
+
+            await sleep(POLL_INTERVAL_MS);
+        }
+
+        return 'expired';
+    }
+
+    async function completeFlow() {
+        return apiClient.fetch({
+            url: apiClient.getUrl('SecureAuth/QR/Complete'),
+            type: 'POST',
+            dataType: 'json',
+            contentType: 'application/json',
+            data: {DeviceId: deviceId(), PairCode: pairingCode}
+        });
+    }
+
+    async function cancelFlow() {
+        cancelled = true;
+        try {
+            await apiClient.fetch({
+                url: apiClient.getUrl('SecureAuth/QR/Cancel', {pairCode: pairingCode}),
+                type: 'POST'
+            });
+        } catch {
+            // best effort - the flow expires on its own anyway
+        }
+        window.location.replace(apiClient.getUrl('web/index.html'));
+    }
+
+    // Writes the AuthenticationResult into localStorage in the same shape as the OIDC
+    // flow page, so jellyfin-web picks the session up automatically.
+    function saveCredentials(result, serverInfo) {
+        if (!result || !result.AccessToken || !result.User) {
+            throw new Error('Server returned an unexpected response');
+        }
+
+        const serverId = result.User.ServerId || serverInfo.Id;
+
+        result.User.EnableAutoLogin = true;
+        localStorage.setItem('user-' + result.User.Id + '-' + serverId, JSON.stringify(result.User));
+
+        const creds = JSON.parse(localStorage.getItem('jellyfin_credentials')) || {};
+        creds.Servers ||= [];
+
+        let server = creds.Servers.find((entry) => entry.Id === serverInfo.Id);
+        if (!server) {
+            server = {
+                Id: serverInfo.Id,
+                Name: serverInfo.ServerName,
+                ManualAddress: apiClient.serverAddress(),
+                DateLastAccessed: new Date().toISOString()
+            };
+            creds.Servers.unshift(server);
+        }
+
+        server.AccessToken = result.AccessToken;
+        server.UserId = result.User.Id;
+        server.DateLastAccessed = new Date().toISOString();
+
+        localStorage.setItem('jellyfin_credentials', JSON.stringify(creds));
+        localStorage.setItem('enableAutoLogin', 'true');
+    }
+
+    // --- flow ----------------------------------------------------------------
+
+    let pairingCode = null;
+    let cancelled = false;
+    let running = false;
+
+    async function start() {
+        cancelled = false;
+        showOnly('stage-qr', 'stage-waiting');
+        setStatus('Waiting for approval…');
+        $('qr-box').innerHTML = '';
+        $('fingerprint').textContent = '······';
+
+        const serverInfo = await getServerInfo();
+        const flow = await createFlow(serverInfo);
+        pairingCode = flow.pairingCode;
+
+        // svgQr is generated server-side by QRCoder - trusted content.
+        $('qr-box').innerHTML = flow.svgQr;
+        $('fingerprint').textContent = flow.fingerprint;
+
+        const state = await pollFlow();
+        if (cancelled) return;
+
+        if (state === 'approved') {
+            setStatus('Approved! Signing you in…');
+            const result = await completeFlow();
+            saveCredentials(result, serverInfo);
+            window.location.replace(apiClient.getUrl('web/index.html'));
+        } else if (state === 'denied') {
+            showOnly('stage-denied');
+        } else if (state === 'expired') {
+            showOnly('stage-expired');
+        } else {
+            fail('Unexpected state: ' + state);
+        }
+    }
+
+    async function main() {
+        if (running) return;
+        running = true;
+        try {
+            await start();
+        } catch (error) {
+            console.error(error);
+            fail(error.message || 'Something went wrong.');
+        } finally {
+            running = false;
+        }
+    }
+
+    $('cancel').addEventListener('click', cancelFlow);
+    document.querySelectorAll('button.restart').forEach((button) => button.addEventListener('click', main));
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', main);
+    } else {
+        main();
+    }
+</script>
+</body>
+</html>
