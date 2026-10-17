@@ -36,7 +36,7 @@ public class QrController(
     {
         stateManager.Invalidate();
 
-        string pairingCode = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(128));
+        string pairingCode = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(48));
         string url = Request.GetRequestBase() + "/AuthViews/QR/Approve?pairingCode=" + pairingCode;
         string svgQr = new SvgQRCode(QRCodeGenerator.GenerateQrCode(url, QRCodeGenerator.ECCLevel.Q)).GetGraphic();
 
