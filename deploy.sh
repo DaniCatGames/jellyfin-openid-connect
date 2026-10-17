@@ -20,6 +20,6 @@ sudo mkdir -p "$PLUGIN_TARGET_DIR"
 sudo unzip -o -q "$ZIP_FILE" -d "$PLUGIN_TARGET_DIR"
 sudo chown -R 1000:1000 "$PLUGIN_TARGET_DIR"
 
-docker compose -f "$DOCKER_ENV_DIR/docker-compose.yml" restart "$CONTAINER_NAME"
+sudo docker compose -f "$DOCKER_ENV_DIR/docker-compose.yml" restart "$CONTAINER_NAME"
 
 echo "done"

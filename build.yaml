@@ -15,4 +15,5 @@ artifacts:
   - "Duende.IdentityModel.OidcClient.dll"
   - "Duende.IdentityModel.dll"
   - "Microsoft.Security.AntiSSRF.dll"
+  - "QRCoder.dll"
 changelog: |-
