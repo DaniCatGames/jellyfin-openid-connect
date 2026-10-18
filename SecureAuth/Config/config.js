@@ -20,6 +20,7 @@ const folderEntries = (folders) => folders.Items.map((f) => ({ id: f.Id, name: f
 function ensureOidcConfig(config) {
     config.OpenIdConnect ||= {};
     config.OpenIdConnect.Providers ||= {};
+    config.Qr ||= {};
     return config.OpenIdConnect;
 }
 
@@ -306,7 +307,8 @@ async function loadConfiguration(view) {
         const config = await getConfig();
         const oidc = ensureOidcConfig(config);
         renderProviderList(view, oidc.Providers);
-        q(view, "#GlobalEnableOidc").checked = !!oidc.Enable;
+        q(view, "#GlobalEnableOidc").checked = !!oidc.Enabled;
+        q(view, "#GlobalEnableQr").checked = !!config.Qr.Enabled;
         q(view, "#GlobalAllowPrivateAvatarIp").checked = !!oidc.AllowPrivateAvatarIp;
         q(view, "#GlobalDisableAvatarSsrfCheck").checked = !!oidc.DisableAvatarSsrfCheck;
         applyVisibility(view); // private-IP field depends on the SSRF toggle
@@ -416,12 +418,14 @@ async function openEditor(view, name) {
 
 function saveGlobalSettings(view) {
     const enableOidc = q(view, "#GlobalEnableOidc").checked;
+    const enableQr = q(view, "#GlobalEnableQr").checked;
     const allowPrivateIp = q(view, "#GlobalAllowPrivateAvatarIp").checked;
     const disableSsrf = q(view, "#GlobalDisableAvatarSsrfCheck").checked;
 
     updateConfig((config) => {
         const oidc = ensureOidcConfig(config);
-        oidc.Enable = enableOidc;
+        oidc.Enabled = enableOidc;
+        config.Qr.Enabled = enableQr;
         oidc.AllowPrivateAvatarIp = allowPrivateIp;
         oidc.DisableAvatarSsrfCheck = disableSsrf;
     })
@@ -629,6 +633,7 @@ export default function (view) {
     });
 
     q(view, "#GlobalEnableOidc").addEventListener("change", () => saveGlobalSettings(view));
+    q(view, "#GlobalEnableQr").addEventListener("change", () => saveGlobalSettings(view));
     q(view, "#GlobalAllowPrivateAvatarIp").addEventListener("change", () => saveGlobalSettings(view));
     q(view, "#GlobalDisableAvatarSsrfCheck").addEventListener("change", () => saveGlobalSettings(view));
 }

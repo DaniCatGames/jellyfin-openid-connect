@@ -34,6 +34,11 @@ public class QrController(
     [Route("Create")]
     public ActionResult Create([FromBody] DeviceData deviceData)
     {
+        if (!SecureAuth.Instance.Configuration.Qr.Enabled)
+        {
+            return BadRequest("QR code authentication is not enabled.");
+        }
+
         stateManager.Invalidate();
 
         string pairingCode = Base64Url.EncodeToString(RandomNumberGenerator.GetBytes(48));

@@ -303,12 +303,12 @@ public class OpenIdConnectController(
         [FromQuery] bool isLinking = false,
         [FromQuery] bool isTesting = false)
     {
-        stateManager.Invalidate();
-
         if (!SecureAuth.Instance.Configuration.OpenIdConnect.Enabled)
         {
             return BadRequest("OpenID Connect is not enabled");
         }
+
+        stateManager.Invalidate();
 
         if (!SecureAuth.Instance.Configuration.OpenIdConnect.Providers.TryGetValue(provider, out OidcProvider config)
             || !config.Enabled)

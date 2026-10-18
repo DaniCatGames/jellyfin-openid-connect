@@ -41,7 +41,12 @@ public class PluginConfiguration : BasePluginConfiguration
 /// </summary>
 [XmlRoot("QR")]
 public class QrConfig
-{ }
+{
+    /// <summary>
+    ///     Whether to enable QR code authentication.
+    /// </summary>
+    public bool Enabled { get; set; }
+}
 
 /// <summary>
 ///     The OIDC configuration.
