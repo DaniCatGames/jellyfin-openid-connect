@@ -60,7 +60,7 @@ public class LinkController(
             return StatusCode(StatusCodes.Status403Forbidden, "User is not allowed to link SSO providers.");
         }
 
-        if (!SecureAuth.Instance.Configuration.Configs.TryGetValue(provider, out _))
+        if (!SecureAuth.Instance.Configuration.OpenIdConnect.Providers.TryGetValue(provider, out _))
         {
             return BadRequest("No matching provider found");
         }

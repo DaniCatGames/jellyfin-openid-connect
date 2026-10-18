@@ -13,27 +13,53 @@ public class PluginConfiguration : BasePluginConfiguration
     /// <summary>
     ///     The current version of the configuration.
     /// </summary>
-    public const int CurrentVersion = 1;
-
-    /// <summary>
-    ///     Initializes a new instance of the <see cref="PluginConfiguration" /> class.
-    /// </summary>
-    public PluginConfiguration()
-    {
-        Configs = new SerializableDictionary<string, Config>();
-        HasMigrated = false;
-    }
-
-    /// <summary>
-    ///     Gets or sets the provider configurations available.
-    /// </summary>
-    [XmlElement("Configs")]
-    public SerializableDictionary<string, Config> Configs { get; set; }
+    public const int CurrentVersion = 2;
 
     /// <summary>
     ///     Gets or sets whether this instance has been migrated from 9p4's plugin.
     /// </summary>
-    public bool HasMigrated { get; set; }
+    public bool HasMigratedFrom9P4 { get; set; }
+
+    /// <summary>
+    ///     The OIDC configuration.
+    /// </summary>
+    public OpenIdConnect OpenIdConnect { get; set; } = new OpenIdConnect();
+
+    /// <summary>
+    ///     The QR configuration.
+    /// </summary>
+    public QrConfig Qr { get; set; } = new QrConfig();
+
+    /// <summary>
+    ///     The version of the configuration.
+    /// </summary>
+    public int ConfigVersion { get; set; } = CurrentVersion;
+}
+
+/// <summary>
+///     The QR configuration.
+/// </summary>
+[XmlRoot("QR")]
+public class QrConfig
+{ }
+
+/// <summary>
+///     The OIDC configuration.
+/// </summary>
+[XmlRoot("OpenIdConnect")]
+public class OpenIdConnect
+{
+    /// <summary>
+    ///     Whether to enable OIDC.
+    /// </summary>
+    public bool Enable { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the provider configurations available.
+    /// </summary>
+    [XmlElement("Providers")]
+    public SerializableDictionary<string, OidcProvider> Providers { get; set; } =
+        new SerializableDictionary<string, OidcProvider>();
 
     /// <summary>
     ///     Whether to allow private IP addresses for avatars.
@@ -44,18 +70,13 @@ public class PluginConfiguration : BasePluginConfiguration
     ///     Whether to disable SSRF protection for avatar IP addresses.
     /// </summary>
     public bool DisableAvatarSsrfCheck { get; set; }
-
-    /// <summary>
-    ///     The version of the configuration.
-    /// </summary>
-    public int ConfigVersion { get; set; } = CurrentVersion;
 }
 
 /// <summary>
-///     The configuration required for a OpenID flow.
+///     The configuration required for a OpenID provider.
 /// </summary>
-[XmlRoot("Provider")]
-public class Config
+[XmlRoot("OidcProvider")]
+public class OidcProvider
 {
     /// <summary>
     ///     Gets or sets the OpenID well-known information endpoint.
@@ -136,8 +157,8 @@ public class Config
     ///     Gets or sets which folders map to what roles in RBAC.
     /// </summary>
     [XmlArray("FolderRoleMappings")]
-    [XmlArrayItem(typeof(FolderRoleMap), ElementName = "FolderRoleMappings")]
-    public List<FolderRoleMap> FolderRoleMapping { get; set; }
+    [XmlArrayItem(typeof(OidcFolderRoleMap), ElementName = "FolderRoleMappings")]
+    public List<OidcFolderRoleMap> FolderRoleMapping { get; set; }
 
     /// <summary>
     ///     Gets or sets a value indicating whether Live TV is enabled by default.
@@ -197,7 +218,7 @@ public class Config
     /// <summary>
     ///     Gets or sets the whether http is used for redirect urls.
     /// </summary>
-    public bool UseHTTP { get; set; }
+    public bool UseHttp { get; set; }
 
     /// <summary>
     ///     Gets or sets a value indicating whether the UserInfo endpoint is used to get profile data.
@@ -223,7 +244,7 @@ public class Config
 /// <summary>
 ///     The OpenID client ID.
 /// </summary>
-public class FolderRoleMap
+public class OidcFolderRoleMap
 {
     /// <summary>
     ///     Gets or sets the role of the mapping.

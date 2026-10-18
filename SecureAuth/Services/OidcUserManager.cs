@@ -33,7 +33,7 @@ public class OidcUserManager(
     private readonly HttpClient _client = CreateClient();
 
     /// <inheritdoc />
-    public async Task<Guid> GetOrCreateUser(string provider, TimedOidcState timedState, Config config)
+    public async Task<Guid> GetOrCreateUser(string provider, TimedOidcState timedState, OidcProvider oidcProvider)
     {
         // if there is a link to the user, return linked id
         if (linkManager.TryGetLink(provider, timedState.Sub, out Guid userId))
@@ -55,9 +55,9 @@ public class OidcUserManager(
             return Guid.Empty;
         }
 
-        string authProvider = string.IsNullOrWhiteSpace(config.DefaultAuthProvider)
+        string authProvider = string.IsNullOrWhiteSpace(oidcProvider.DefaultAuthProvider)
             ? "Jellyfin.Plugin.SecureAuth.Auth.OIDCProvider"
-            : config.DefaultAuthProvider;
+            : oidcProvider.DefaultAuthProvider;
 
         // There is no link to this user yet.
         // Try to get user by username
@@ -66,7 +66,7 @@ public class OidcUserManager(
         // if there is no match by username, create a new user
         if (existingUser == null)
         {
-            if (!config.EnableUserProvisioning)
+            if (!oidcProvider.EnableUserProvisioning)
             {
                 logger.LogError("Tried to create a new user {Username}, but provisioning is disabled.",
                     timedState.Username);
@@ -77,15 +77,15 @@ public class OidcUserManager(
 
             existingUser = await CreateUserAndLink(provider, timedState.Sub, timedState.Username, authProvider)
                 .ConfigureAwait(false);
-            await UpdateUser(config, timedState, existingUser).ConfigureAwait(false);
+            await UpdateUser(oidcProvider, timedState, existingUser).ConfigureAwait(false);
             return existingUser.Id;
         }
 
         // if a user exists with a matching name, check allowlist
-        if (config.AutoLinkingAllowList != null
-            && config.AutoLinkingAllowList.Contains(timedState.Username, StringComparer.OrdinalIgnoreCase))
+        if (oidcProvider.AutoLinkingAllowList != null
+            && oidcProvider.AutoLinkingAllowList.Contains(timedState.Username, StringComparer.OrdinalIgnoreCase))
         {
-            config.AutoLinkingAllowList = config.AutoLinkingAllowList
+            oidcProvider.AutoLinkingAllowList = oidcProvider.AutoLinkingAllowList
                 .Where(u => !u.Equals(timedState.Username, StringComparison.OrdinalIgnoreCase))
                 .ToArray();
             SecureAuth.Instance.UpdateConfiguration(SecureAuth.Instance.Configuration);
@@ -99,7 +99,7 @@ public class OidcUserManager(
         }
 
         // user exists but isnt in allowlist, so create a new one with an alt username
-        if (!config.EnableUserProvisioning)
+        if (!oidcProvider.EnableUserProvisioning)
         {
             logger.LogInformation(
                 "OIDC user {Username} has no linked jellyfin user, tried to create a new user but provisioning is disabled.",
@@ -135,7 +135,7 @@ public class OidcUserManager(
 
         newUser = await CreateUserAndLink(provider, timedState.Sub, newUsername, authProvider)
             .ConfigureAwait(false);
-        await UpdateUser(config, timedState, newUser).ConfigureAwait(false);
+        await UpdateUser(oidcProvider, timedState, newUser).ConfigureAwait(false);
         return newUser.Id;
     }
 
@@ -155,7 +155,7 @@ public class OidcUserManager(
     public async Task<AuthenticationResult> AuthenticateUser(
         Guid userId,
         AuthResponse authResponse,
-        Config config,
+        OidcProvider oidcProvider,
         TimedOidcState timedState,
         string ipAddress)
     {
@@ -166,9 +166,9 @@ public class OidcUserManager(
             throw new Exception("User not found");
         }
 
-        if (config.UpdateUsersOnLogin)
+        if (oidcProvider.UpdateUsersOnLogin)
         {
-            await UpdateUser(config, timedState, user).ConfigureAwait(false);
+            await UpdateUser(oidcProvider, timedState, user).ConfigureAwait(false);
         }
 
         var authRequest = new AuthenticationRequest
@@ -204,12 +204,12 @@ public class OidcUserManager(
     }
 
     private async Task UpdateUser(
-        Config config,
+        OidcProvider oidcProvider,
         TimedOidcState timedState,
         User user)
     {
         user.SetPermission(PermissionKind.IsAdministrator, timedState.Admin);
-        user.SetPermission(PermissionKind.EnableAllFolders, config.EnableAllFolders);
+        user.SetPermission(PermissionKind.EnableAllFolders, oidcProvider.EnableAllFolders);
 
         Guid[] folders = timedState.DefaultAllowedFolders
             .Concat(timedState.RbacFolders)
@@ -220,9 +220,9 @@ public class OidcUserManager(
         user.SetPreference(PreferenceKind.EnabledFolders, folders);
 
         user.SetPermission(PermissionKind.EnableLiveTvAccess,
-            config.EnableLiveTvRoles ? timedState.EnableLiveTv : config.EnableLiveTv);
+            oidcProvider.EnableLiveTvRoles ? timedState.EnableLiveTv : oidcProvider.EnableLiveTv);
         user.SetPermission(PermissionKind.EnableLiveTvManagement,
-            config.EnableLiveTvRoles ? timedState.EnableLiveTvManagement : config.EnableLiveTvManagement);
+            oidcProvider.EnableLiveTvRoles ? timedState.EnableLiveTvManagement : oidcProvider.EnableLiveTvManagement);
 
         if (timedState.AvatarURL is not null)
         {
@@ -290,14 +290,14 @@ public class OidcUserManager(
     private static HttpClient CreateClient()
     {
         HttpClient client;
-        if (SecureAuth.Instance.Configuration.DisableAvatarSsrfCheck)
+        if (SecureAuth.Instance.Configuration.OpenIdConnect.DisableAvatarSsrfCheck)
         {
             client = new HttpClient();
         }
         else
         {
             var policy = new AntiSSRFPolicy(PolicyConfigOptions.ExternalOnlyLatest);
-            if (SecureAuth.Instance.Configuration.AllowPrivateAvatarIp)
+            if (SecureAuth.Instance.Configuration.OpenIdConnect.AllowPrivateAvatarIp)
             {
                 policy.AddAllowedAddresses(IPAddressRanges.privateUse);
             }

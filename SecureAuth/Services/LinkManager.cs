@@ -10,7 +10,7 @@ public class LinkManager : ILinkManager
     /// <inheritdoc />
     public bool TryGetLinks(string provider, out SerializableDictionary<string, Guid> links)
     {
-        if (!SecureAuth.Instance.Configuration.Configs.TryGetValue(provider, out Config config))
+        if (!SecureAuth.Instance.Configuration.OpenIdConnect.Providers.TryGetValue(provider, out OidcProvider config))
         {
             links = new SerializableDictionary<string, Guid>();
             return false;
@@ -50,12 +50,12 @@ public class LinkManager : ILinkManager
     public bool TryUpdateLinkConfig(string provider, SerializableDictionary<string, Guid> links)
     {
         PluginConfiguration config = SecureAuth.Instance.Configuration;
-        if (!config.Configs.TryGetValue(provider, out _))
+        if (!config.OpenIdConnect.Providers.TryGetValue(provider, out _))
         {
             return false;
         }
 
-        config.Configs[provider].Links = links;
+        config.OpenIdConnect.Providers[provider].Links = links;
         SecureAuth.Instance.UpdateConfiguration(config);
         return true;
     }
@@ -76,7 +76,8 @@ public class LinkManager : ILinkManager
     /// <inheritdoc />
     public SerializableDictionary<string, IEnumerable<string>> GetLinksByUser(Guid userId)
     {
-        SerializableDictionary<string, Config> providerList = SecureAuth.Instance.Configuration.Configs;
+        SerializableDictionary<string, OidcProvider> providerList =
+            SecureAuth.Instance.Configuration.OpenIdConnect.Providers;
         Dictionary<string, IEnumerable<string>> mappings = providerList
             .ToDictionary(
                 provider => provider.Key,

@@ -63,7 +63,7 @@ public class OpenIdConnectController(
         [FromQuery] string state)
     {
         // If the config doesn't have an active provider matching the request, show an error
-        if (!SecureAuth.Instance.Configuration.Configs.TryGetValue(provider, out Config config)
+        if (!SecureAuth.Instance.Configuration.OpenIdConnect.Providers.TryGetValue(provider, out OidcProvider config)
             || !config.Enabled)
         {
             return BadRequest("No matching provider found");
@@ -178,25 +178,25 @@ public class OpenIdConnectController(
 
         return Content(Pages.RenderFlowPage(state,
                 provider,
-                Request.GetRequestBase(config.UseHTTP, config.PortOverride),
+                Request.GetRequestBase(config.UseHttp, config.PortOverride),
                 timedState.IsLinking),
             MediaTypeNames.Text.Html);
     }
 
-    private OidcClient CreateClient(string provider, Config config)
+    private OidcClient CreateClient(string provider, OidcProvider oidcProvider)
     {
-        string[] scopes = config.Scopes ?? new string[2];
+        string[] scopes = oidcProvider.Scopes ?? new string[2];
         var options = new OidcClientOptions
         {
-            Authority = config.Endpoint,
-            ClientId = config.ClientId,
-            ClientSecret = config.Secret,
-            RedirectUri = Request.GetRequestBase(config.UseHTTP, config.PortOverride)
+            Authority = oidcProvider.Endpoint,
+            ClientId = oidcProvider.ClientId,
+            ClientSecret = oidcProvider.Secret,
+            RedirectUri = Request.GetRequestBase(oidcProvider.UseHttp, oidcProvider.PortOverride)
                           + $"/SecureAuth/OIDC/redirect/{provider}",
             Scope = string.Join(" ", scopes.Prepend("openid profile")),
-            DisablePushedAuthorization = config.DisablePushedAuthorization,
+            DisablePushedAuthorization = oidcProvider.DisablePushedAuthorization,
             LoggerFactory = loggerFactory,
-            LoadProfile = !config.DoNotLoadProfile,
+            LoadProfile = !oidcProvider.DoNotLoadProfile,
             HttpClientFactory = _ =>
             {
                 HttpClient client = httpClientFactory.CreateClient();
@@ -211,10 +211,11 @@ public class OpenIdConnectController(
             {
                 Discovery =
                 {
-                    AdditionalEndpointBaseAddresses = { new Uri(config.Endpoint).GetLeftPart(UriPartial.Authority) },
-                    ValidateEndpoints = !config.DoNotValidateEndpoints,
-                    RequireHttps = !config.DisableHttps,
-                    ValidateIssuerName = !config.DoNotValidateIssuerName,
+                    AdditionalEndpointBaseAddresses =
+                        { new Uri(oidcProvider.Endpoint).GetLeftPart(UriPartial.Authority) },
+                    ValidateEndpoints = !oidcProvider.DoNotValidateEndpoints,
+                    RequireHttps = !oidcProvider.DisableHttps,
+                    ValidateIssuerName = !oidcProvider.DoNotValidateIssuerName,
                 },
             },
         };
@@ -226,7 +227,7 @@ public class OpenIdConnectController(
     private void ProcessRoles(
         string[] segments,
         IEnumerable<Claim> claims,
-        Config config,
+        OidcProvider oidcProvider,
         TimedOidcState timedState)
     {
         List<string> roles = [];
@@ -270,18 +271,19 @@ public class OpenIdConnectController(
             }
         }
 
-        timedState.Valid = roles.Any(role => config.Roles?.Contains(role) == true)
-                           || roles.Any(role => config.AdminRoles?.Contains(role) == true);
+        timedState.Valid = roles.Any(role => oidcProvider.Roles?.Contains(role) == true)
+                           || roles.Any(role => oidcProvider.AdminRoles?.Contains(role) == true);
 
-        timedState.Admin = roles.Any(role => config.AdminRoles?.Contains(role) == true);
+        timedState.Admin = roles.Any(role => oidcProvider.AdminRoles?.Contains(role) == true);
 
-        timedState.EnableLiveTv = roles.Any(role => config.LiveTvRoles?.Contains(role) == true);
-        timedState.EnableLiveTvManagement = roles.Any(role => config.LiveTvManagementRoles?.Contains(role) == true);
+        timedState.EnableLiveTv = roles.Any(role => oidcProvider.LiveTvRoles?.Contains(role) == true);
+        timedState.EnableLiveTvManagement =
+            roles.Any(role => oidcProvider.LiveTvManagementRoles?.Contains(role) == true);
 
         // Get allowed folders from roles
-        if (config.FolderRoleMapping is { Count: >= 1 })
+        if (oidcProvider.FolderRoleMapping is { Count: >= 1 })
         {
-            IEnumerable<string> folders = config.FolderRoleMapping
+            IEnumerable<string> folders = oidcProvider.FolderRoleMapping
                 .Where(map => roles.Any(role => role.Equals(map.Role.Trim(), StringComparison.Ordinal)))
                 .SelectMany(map => map.Folders ?? []);
             timedState.RbacFolders.AddRange(folders);
@@ -303,7 +305,7 @@ public class OpenIdConnectController(
     {
         stateManager.Invalidate();
 
-        if (!SecureAuth.Instance.Configuration.Configs.TryGetValue(provider, out Config config)
+        if (!SecureAuth.Instance.Configuration.OpenIdConnect.Providers.TryGetValue(provider, out OidcProvider config)
             || !config.Enabled)
         {
             return BadRequest("Provider does not exist");
@@ -355,7 +357,7 @@ public class OpenIdConnectController(
     [Produces(MediaTypeNames.Application.Json)]
     public async Task<ActionResult> Authenticate(string provider, [FromBody] AuthResponse response)
     {
-        if (!SecureAuth.Instance.Configuration.Configs.TryGetValue(provider, out Config config)
+        if (!SecureAuth.Instance.Configuration.OpenIdConnect.Providers.TryGetValue(provider, out OidcProvider config)
             || !config.Enabled)
         {
             return BadRequest("Provider does not exist");

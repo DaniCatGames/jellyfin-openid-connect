@@ -102,8 +102,8 @@ public class SsoAuthProvider
     ///     Gets or sets which folders map to what roles in RBAC.
     /// </summary>
     [XmlArray("FolderRoleMappings")]
-    [XmlArrayItem(typeof(FolderRoleMap), ElementName = "FolderRoleMappings")]
-    public List<FolderRoleMap> FolderRoleMapping { get; set; }
+    [XmlArrayItem(typeof(SsoFolderRoleMap), ElementName = "FolderRoleMappings")]
+    public List<SsoFolderRoleMap> FolderRoleMapping { get; set; }
 
     /// <summary>
     ///     Gets or sets the claim to check roles against. Separated by "."s.
@@ -179,4 +179,20 @@ public class SsoAuthProvider
     ///     Gets or sets a value indicating whether the UserInfo endpoint is used to get profile data.
     /// </summary>
     public bool DoNotLoadProfile { get; set; }
+}
+
+/// <summary>
+///     The OpenID client ID.
+/// </summary>
+public class SsoFolderRoleMap
+{
+    /// <summary>
+    ///     Gets or sets the role of the mapping.
+    /// </summary>
+    public string Role { get; set; }
+
+    /// <summary>
+    ///     Gets or sets the folders that are allowed from the given role.
+    /// </summary>
+    public List<string> Folders { get; set; }
 }

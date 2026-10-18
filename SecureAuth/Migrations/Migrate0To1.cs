@@ -7,9 +7,9 @@ namespace Jellyfin.Plugin.SecureAuth.Migrations;
 
 public static class Migrate0To1
 {
-    public static PluginConfiguration ToV1(PluginConfiguration0 old)
+    public static PluginConfiguration1 ToV1(PluginConfiguration0 old)
     {
-        var config = new PluginConfiguration
+        var config = new PluginConfiguration1
         {
             AllowPrivateAvatarIp = old.AllowPrivateAvatarIp,
             ConfigVersion = 1,
@@ -25,9 +25,9 @@ public static class Migrate0To1
         return config;
     }
 
-    private static Config ToV1(Config0 old)
+    private static Config1 ToV1(Config0 old)
     {
-        return new Config
+        return new Config1
         {
             Endpoint = old.Endpoint,
             ClientId = old.ClientId,
@@ -65,9 +65,9 @@ public static class Migrate0To1
         };
     }
 
-    private static List<FolderRoleMap> ToV1(List<FolderRoleMap0> old)
+    private static List<FolderRoleMap1> ToV1(List<FolderRoleMap0> old)
     {
-        return old?.Select(static m => new FolderRoleMap
+        return old?.Select(static m => new FolderRoleMap1
         {
             Role = m.Role,
             Folders = m.Folders ?? [],

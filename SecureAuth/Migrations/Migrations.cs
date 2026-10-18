@@ -22,6 +22,7 @@ public static class Migrations
             config = version switch
             {
                 0 => Migrate0To1.ToV1((PluginConfiguration0)config),
+                1 => Migrate1To2.ToV2((PluginConfiguration1)config),
                 _ => throw new InvalidOperationException($"No migration registered from config version {version}."),
             };
             version++;
@@ -46,6 +47,7 @@ public static class Migrations
         return version switch
         {
             0 => xmlSerializer.DeserializeFromFile(typeof(PluginConfiguration0), path),
+            1 => xmlSerializer.DeserializeFromFile(typeof(PluginConfiguration1), path),
             _ => throw new InvalidOperationException($"No snapshot type registered for config version {version}."),
         };
     }

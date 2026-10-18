@@ -16,22 +16,22 @@ public interface IOidcUserManager
     /// </summary>
     /// <param name="provider">Provider the user logged in with.</param>
     /// <param name="timedState">TimedState belonging to the flow</param>
-    /// <param name="config">The server config.</param>
+    /// <param name="oidcProvider">The server config.</param>
     /// <returns></returns>
-    Task<Guid> GetOrCreateUser(string provider, TimedOidcState timedState, Config config);
+    Task<Guid> GetOrCreateUser(string provider, TimedOidcState timedState, OidcProvider oidcProvider);
 
     /// <summary>
     ///     Authenticates the user with the given information.
     /// </summary>
     /// <param name="userId">The user id of the user to authenticate.</param>
     /// <param name="authResponse">The client information to authenticate the user with.</param>
-    /// <param name="config">The provider config.</param>
+    /// <param name="oidcProvider">The provider config.</param>
     /// <param name="timedState">The state belonging to the flow.</param>
     /// <param name="ipAddress">The IP address of the authenticating user.</param>
     Task<AuthenticationResult> AuthenticateUser(
         Guid userId,
         AuthResponse authResponse,
-        Config config,
+        OidcProvider oidcProvider,
         TimedOidcState timedState,
         string ipAddress);
 

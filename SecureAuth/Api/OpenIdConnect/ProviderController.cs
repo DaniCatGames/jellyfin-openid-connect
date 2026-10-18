@@ -28,33 +28,33 @@ public class ProviderController(
     ///     it will be overwritten.
     /// </summary>
     /// <param name="provider">The name of the provider to add.</param>
-    /// <param name="config">The OID configuration (deserialized from a JSON post).</param>
+    /// <param name="oidcProvider">The OID configuration (deserialized from a JSON post).</param>
     [Authorize(Policy = Policies.RequiresElevation)]
     [HttpPut("{provider}")]
-    public ActionResult AddProvider(string provider, [FromBody] Config config)
+    public ActionResult AddProvider(string provider, [FromBody] OidcProvider oidcProvider)
     {
         if (!Regex.IsMatch(provider, @"^[a-zA-Z0-9\-_]+$"))
         {
             return BadRequest("Provider name must only contain letters, numbers, dashes, and underscores.");
         }
 
-        if (config.Endpoint == null)
+        if (oidcProvider.Endpoint == null)
         {
             return BadRequest("Endpoint is required");
         }
 
-        if (config.ClientId == null)
+        if (oidcProvider.ClientId == null)
         {
             return BadRequest("Client ID is required");
         }
 
-        if (config.Secret == null)
+        if (oidcProvider.Secret == null)
         {
             return BadRequest("Client secret is required");
         }
 
         PluginConfiguration configuration = SecureAuth.Instance.Configuration;
-        configuration.Configs[provider] = config;
+        configuration.OpenIdConnect.Providers[provider] = oidcProvider;
         SecureAuth.Instance.UpdateConfiguration(configuration);
 
         logger.LogInformation("Added OIDC provider {provider}", provider);
@@ -75,7 +75,7 @@ public class ProviderController(
         }
 
         PluginConfiguration configuration = SecureAuth.Instance.Configuration;
-        if (!configuration.Configs.Remove(provider))
+        if (!configuration.OpenIdConnect.Providers.Remove(provider))
         {
             return NotFound("Provider not found");
         }
@@ -94,7 +94,7 @@ public class ProviderController(
     [HttpGet("")]
     public ActionResult GetProviders()
     {
-        return Ok(SecureAuth.Instance.Configuration.Configs);
+        return Ok(SecureAuth.Instance.Configuration.OpenIdConnect.Providers);
     }
 
     /// <summary>
@@ -104,7 +104,7 @@ public class ProviderController(
     [HttpGet("Names")]
     public ActionResult GetProviderNames()
     {
-        return Ok(SecureAuth.Instance.Configuration.Configs.Keys);
+        return Ok(SecureAuth.Instance.Configuration.OpenIdConnect.Providers.Keys);
     }
 
     /// <summary>
@@ -116,7 +116,7 @@ public class ProviderController(
     public ActionResult MigrationAvailable([FromServices] IApplicationPaths applicationPaths)
     {
         string oldPath = Path.Combine(applicationPaths.PluginConfigurationsPath, "SSO-Auth.xml");
-        bool hasMigrated = SecureAuth.Instance.Configuration.HasMigrated;
+        bool hasMigrated = SecureAuth.Instance.Configuration.HasMigratedFrom9P4;
 
         return Ok(System.IO.File.Exists(oldPath) && !hasMigrated);
     }
@@ -174,7 +174,7 @@ public class ProviderController(
                 }
             }
 
-            var newConfig = new Config
+            var newConfig = new OidcProvider
             {
                 Endpoint = ssoAuthProvider.OidEndpoint,
                 ClientId = ssoAuthProvider.OidClientId,
@@ -191,7 +191,11 @@ public class ProviderController(
                 EnableAllFolders = ssoAuthProvider.EnableAllFolders,
                 EnabledFolders = ssoAuthProvider.EnabledFolders,
                 EnableFolderRoles = ssoAuthProvider.EnableFolderRoles,
-                FolderRoleMapping = ssoAuthProvider.FolderRoleMapping,
+                FolderRoleMapping = ssoAuthProvider.FolderRoleMapping.ConvertAll(roleMap => new OidcFolderRoleMap
+                {
+                    Folders = roleMap.Folders,
+                    Role = roleMap.Role,
+                }),
                 EnableLiveTv = ssoAuthProvider.EnableLiveTv,
                 EnableLiveTvManagement = ssoAuthProvider.EnableLiveTvManagement,
                 EnableLiveTvRoles = ssoAuthProvider.EnableLiveTvRoles,
@@ -203,18 +207,18 @@ public class ProviderController(
                 DisablePushedAuthorization = ssoAuthProvider.DisablePushedAuthorization,
                 DoNotValidateEndpoints = ssoAuthProvider.DoNotValidateEndpoints,
                 DoNotValidateIssuerName = ssoAuthProvider.DoNotValidateIssuerName,
-                UseHTTP = ssoAuthProvider.SchemeOverride == "http",
+                UseHttp = ssoAuthProvider.SchemeOverride == "http",
                 DoNotLoadProfile = ssoAuthProvider.DoNotLoadProfile,
                 PortOverride = ssoAuthProvider.PortOverride,
                 Links = new SerializableDictionary<string, Guid>(),
             };
 
-            currentConfig.Configs[name] = newConfig;
+            currentConfig.OpenIdConnect.Providers[name] = newConfig;
 
             logger.LogInformation("Migrated OIDC provider {provider}", name);
         }
 
-        currentConfig.HasMigrated = true;
+        currentConfig.HasMigratedFrom9P4 = true;
 
         SecureAuth.Instance.UpdateConfiguration(currentConfig);
 
