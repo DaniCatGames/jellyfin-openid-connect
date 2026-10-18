@@ -108,6 +108,25 @@
             <!-- ===================== Dashboard view ===================== -->
 
             <div id="oidc-dashboard-view">
+                <form class="esqConfigurationForm" style="margin-bottom: 1.5em;">
+                    <div class="verticalSection" style="max-width: 50em;">
+                        <h3 class="sectionTitle">General Settings</h3>
+                        <div class="collapseContent">
+                            <div class="checkboxContainer checkboxContainer-withDescription"
+                                 id="Container-GlobalEnableOidc" style="margin-bottom: 0;">
+                                <label>
+                                    <input class="emby-checkbox" id="GlobalEnableOidc" is="emby-checkbox"
+                                           type="checkbox"/>
+                                    <span>Enable OpenID Connect</span>
+                                </label>
+                                <div class="fieldDescription checkboxFieldDescription">
+                                    Enables or disables OpenID Connect authentication across all configured providers.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </form>
+
                 <div class="oidc-dashboard-header">
                     <h3 class="sectionTitle" style="margin: 0;">Configured Providers</h3>
                 </div>
@@ -143,7 +162,7 @@
                     Migrate providers from 9p4 plugin
                 </button>
 
-                <form class="esqConfigurationForm" style="margin-bottom: 2em;">
+                <form class="esqConfigurationForm" style="margin-top: 1.5em; margin-bottom: 2em;">
                     <div class="verticalSection oidc-danger-section" style="max-width: 50em;">
                         <h3 class="sectionTitle">User Avatar SSRF Protection</h3>
                         <div class="collapseContent">
@@ -556,7 +575,7 @@
 
                             <div class="checkboxContainer">
                                 <label>
-                                    <input class="oidc-toggle" id="UseHTTP" is="emby-checkbox" name="UseHTTP"
+                                    <input class="oidc-toggle" id="UseHttp" is="emby-checkbox" name="UseHttp"
                                            type="checkbox"/>
                                     <span>Use HTTP in redirects instead of HTTPS.</span>
                                 </label>

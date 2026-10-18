@@ -52,7 +52,7 @@ public class OpenIdConnect
     /// <summary>
     ///     Whether to enable OIDC.
     /// </summary>
-    public bool Enable { get; set; }
+    public bool Enabled { get; set; }
 
     /// <summary>
     ///     Gets or sets the provider configurations available.

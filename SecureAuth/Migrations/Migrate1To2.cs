@@ -15,7 +15,7 @@ public static class Migrate1To2
             HasMigratedFrom9P4 = old.HasMigrated,
             OpenIdConnect = new OpenIdConnect
             {
-                Enable = true,
+                Enabled = true,
                 AllowPrivateAvatarIp = old.AllowPrivateAvatarIp,
                 DisableAvatarSsrfCheck = old.DisableAvatarSsrfCheck,
             },

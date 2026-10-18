@@ -16,6 +16,13 @@ const q = (view, selector) => view.querySelector(selector);
 
 const folderEntries = (folders) => folders.Items.map((f) => ({ id: f.Id, name: f.Name }));
 
+// Ensures the nested OpenIdConnect structure is always present on the config object.
+function ensureOidcConfig(config) {
+    config.OpenIdConnect ||= {};
+    config.OpenIdConnect.Providers ||= {};
+    return config.OpenIdConnect;
+}
+
 // ============ 2. Config access ============
 
 function getConfig() {
@@ -30,6 +37,7 @@ function getConfig() {
 function updateConfig(mutate) {
     const request = writeQueue.then(async () => {
         const config = await ApiClient.getPluginConfiguration(PLUGIN_ID); // always fresh for writes
+        ensureOidcConfig(config);
         if (mutate(config) === false) return null;
         const result = await ApiClient.updatePluginConfiguration(PLUGIN_ID, config);
         configPromise = null; // next read refetches
@@ -296,9 +304,11 @@ function serializeRoleMappings(container) {
 async function loadConfiguration(view) {
     try {
         const config = await getConfig();
-        renderProviderList(view, config.Configs || {});
-        q(view, "#GlobalAllowPrivateAvatarIp").checked = !!config.AllowPrivateAvatarIp;
-        q(view, "#GlobalDisableAvatarSsrfCheck").checked = !!config.DisableAvatarSsrfCheck;
+        const oidc = ensureOidcConfig(config);
+        renderProviderList(view, oidc.Providers);
+        q(view, "#GlobalEnableOidc").checked = !!oidc.Enable;
+        q(view, "#GlobalAllowPrivateAvatarIp").checked = !!oidc.AllowPrivateAvatarIp;
+        q(view, "#GlobalDisableAvatarSsrfCheck").checked = !!oidc.DisableAvatarSsrfCheck;
         applyVisibility(view); // private-IP field depends on the SSRF toggle
     } catch {
         Dashboard.alert("Failed to load plugin configuration.");
@@ -324,7 +334,8 @@ async function loadConfiguration(view) {
 
 async function loadProvider(view, name) {
     const config = await getConfig();
-    const provider = config.Configs[name] || {};
+    const oidc = ensureOidcConfig(config);
+    const provider = oidc.Providers[name] || {};
     const fields = listFields(view);
 
     q(view, "#ProviderName").value = name;
@@ -404,12 +415,15 @@ async function openEditor(view, name) {
 }
 
 function saveGlobalSettings(view) {
+    const enableOidc = q(view, "#GlobalEnableOidc").checked;
     const allowPrivateIp = q(view, "#GlobalAllowPrivateAvatarIp").checked;
     const disableSsrf = q(view, "#GlobalDisableAvatarSsrfCheck").checked;
 
     updateConfig((config) => {
-        config.AllowPrivateAvatarIp = allowPrivateIp;
-        config.DisableAvatarSsrfCheck = disableSsrf;
+        const oidc = ensureOidcConfig(config);
+        oidc.Enable = enableOidc;
+        oidc.AllowPrivateAvatarIp = allowPrivateIp;
+        oidc.DisableAvatarSsrfCheck = disableSsrf;
     })
         .then((result) => Dashboard.processPluginConfigurationUpdateResult(result))
         .catch(() => Dashboard.alert("Failed to save global settings."));
@@ -423,7 +437,15 @@ async function saveProvider(view) {
     const fields = listFields(view);
     const provider = {};
 
-    for (const id of fields.text) provider[id] = q(view, `#${id}`).value || null;
+    for (const id of fields.text) {
+        const raw = q(view, `#${id}`).value.trim();
+        if (id === "PortOverride") {
+            const parsed = parseInt(raw, 10);
+            provider[id] = Number.isNaN(parsed) ? null : parsed;
+        } else {
+            provider[id] = raw || null;
+        }
+    }
     for (const id of fields.check) provider[id] = q(view, `#${id}`).checked;
     for (const id of fields.textList) provider[id] = parseTextList(q(view, `#${id}`));
     for (const id of fields.select) provider[id] = q(view, `#${id}`).value || null;
@@ -435,16 +457,18 @@ async function saveProvider(view) {
     provider.Scopes = ScopeManager.get();
 
     try {
-        // Merge over the existing entry so server-side-only fields survive.
+        // Merge over the existing entry so server-side-only fields (like Links) survive.
         const result = await updateConfig((config) => {
-            if (name !== editingName && Object.hasOwn(config.Configs, name)) {
+            const oidc = ensureOidcConfig(config);
+            if (name !== editingName && Object.hasOwn(oidc.Providers, name)) {
                 alert(`Provider "${name}" already exists.`);
                 return false;
             }
-            const merged = { ...(config.Configs[editingName] || {}), ...provider };
-            if (name !== editingName) delete config.Configs[editingName];
-            config.Configs[name] = merged;
+            const merged = { ...(oidc.Providers[editingName] || {}), ...provider };
+            if (name !== editingName) delete oidc.Providers[editingName];
+            oidc.Providers[name] = merged;
         });
+        if (result === null) return false;
         Dashboard.processPluginConfigurationUpdateResult(result);
         dirty = false;
         loadConfiguration(view);
@@ -461,8 +485,9 @@ async function deleteProvider(view, name) {
 
     try {
         const result = await updateConfig((config) => {
-            if (!Object.hasOwn(config.Configs, name)) return false;
-            delete config.Configs[name];
+            const oidc = ensureOidcConfig(config);
+            if (!Object.hasOwn(oidc.Providers, name)) return false;
+            delete oidc.Providers[name];
             return true;
         });
         if (result === null) {
@@ -603,6 +628,7 @@ export default function (view) {
         icon.textContent = show ? "visibility_off" : "visibility";
     });
 
+    q(view, "#GlobalEnableOidc").addEventListener("change", () => saveGlobalSettings(view));
     q(view, "#GlobalAllowPrivateAvatarIp").addEventListener("change", () => saveGlobalSettings(view));
     q(view, "#GlobalDisableAvatarSsrfCheck").addEventListener("change", () => saveGlobalSettings(view));
 }
